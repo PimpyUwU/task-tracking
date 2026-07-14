@@ -1,26 +1,344 @@
 @import "tailwindcss";
 
+/* ============================================================
+   FluxWork — light "studio" design system
+   Cool cream canvas, white surfaces, hairline borders.
+   Teal = primary action / selection / running timer.
+   Semantic pair: billable = green · non-billable = cool steel.
+   Brass = "no rate / attention" accent rule. Committed light theme.
+   Type: Instrument Serif (display) · Hanken Grotesk (UI) · IBM Plex Mono (data).
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces — cool cream ground, white panels */
+  --paper: #eef1f1;        /* app ground / canvas */
+  --paper-2: #ffffff;      /* panels / cards / inputs */
+  --surface-2: #e7ecec;    /* raised / hover */
+  --surface-3: #dce3e3;    /* highest / active nav track */
+
+  /* Text — deep slate ink biased warm-cool neutral */
+  --ink: #0f1a1c;
+  --ink-2: #566468;
+  --ink-3: #7e8a8d;
+
+  /* Hairlines */
+  --line: #dce2e1;
+  --line-strong: #c7d0cf;
+
+  /* Accent — teal: primary action / selection / running timer */
+  --accent: #0e5c63;
+  --accent-2: #0a474d;
+  --accent-ink: #ffffff;
+  --accent-dim: rgba(14, 92, 99, 0.10);
+  --accent-line: rgba(14, 92, 99, 0.30);
+
+  /* Billable / earnings — green (positive money) */
+  --gold: #176048;
+  --gold-2: #1c7355;
+  --gold-dim: rgba(23, 96, 72, 0.11);
+  --gold-line: rgba(23, 96, 72, 0.30);
+
+  /* Non-billable — deliberately cool steel */
+  --steel: #5f6a6e;
+  --steel-dim: rgba(95, 106, 110, 0.12);
+  --steel-line: rgba(95, 106, 110, 0.30);
+
+  /* Brass — "no rate / attention" accent rule */
+  --brass: #b9791f;
+  --brass-ink: #8a5a12;
+  --brass-dim: rgba(185, 121, 31, 0.14);
+  --brass-line: rgba(185, 121, 31, 0.34);
+
+  /* Warnings / can't-invoice / destructive */
+  --danger: #c0483b;
+  --danger-dim: rgba(192, 72, 59, 0.10);
+  --danger-line: rgba(192, 72, 59, 0.30);
+
+  /* Inverted (dark) panels — invoice card / running-timer dock */
+  --on-dark: #eef1f1;
+  --on-dark-mut: #9fb0b0;
+  --d-teal: #59c7c1;
+  --d-brass: #e0b36a;
+
+  --radius: 0.6875rem;      /* controls (11px, matches func) */
+  --radius-card: 1rem;      /* cards / panels (16px) */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-gold: var(--gold);
+  --color-steel: var(--steel);
+  --color-brass: var(--brass);
+  --color-danger: var(--danger);
+  --color-on-dark: var(--on-dark);
+  --color-d-teal: var(--d-teal);
+  --color-d-brass: var(--d-brass);
+  --font-sans: var(--font-flux-sans);
+  --font-mono: var(--font-flux-mono);
+  --font-serif: var(--font-flux-serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+}
+
+@layer components {
+  /* ---- Typographic primitives ---- */
+  /* Instrument Serif — display face for headings & big earnings numbers. */
+  .serif {
+    font-family: var(--font-serif), Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+  }
+
+  .label {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.6563rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-2);
+  }
+
+  .panel-title {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+  }
+
+  /* IBM Plex Mono — reserved for DATA: times, money, rates, codes. */
+  .num {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.01em;
+  }
+
+  .rule-t { border-top: 1px solid var(--color-line); }
+  .rule-b { border-bottom: 1px solid var(--color-line); }
+
+  /* ---- Layered surface ---- */
+  .panel {
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: 0 1px 2px rgba(15, 26, 28, 0.03);
+  }
+
+  /* Inverted emphasis panel (invoice / dock) */
+  .panel-dark {
+    background: var(--color-ink);
+    color: var(--color-on-dark);
+    border-radius: var(--radius-card);
+  }
+
+  /* ---- Buttons ---- */
+  .btn {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.6rem 1rem;
+    border: 1.5px solid var(--color-line-strong);
+    border-radius: var(--radius);
+    color: var(--color-ink);
+    background: var(--color-paper-2);
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease,
+      transform 150ms ease;
+    cursor: pointer;
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-ink-3);
+  }
+  .btn:focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-accent {
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    border-color: var(--color-accent);
+    font-weight: 700;
+  }
+  .btn-accent:hover {
+    background: var(--accent-2);
+    border-color: var(--accent-2);
+    color: var(--color-accent-ink);
+  }
+
+  /* Teal-on-dark call to action (used inside dark panels) */
+  .btn-teal {
+    background: var(--d-teal);
+    color: var(--color-ink);
+    border-color: var(--d-teal);
+    font-weight: 700;
+  }
+  .btn-teal:hover { background: #6fd3ce; border-color: #6fd3ce; }
+
+  .btn-ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-ink-2);
+  }
+  .btn-ghost:hover {
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+    border-color: transparent;
+  }
+
+  .btn-danger {
+    background: transparent;
+    border-color: var(--danger-line);
+    color: var(--danger);
+  }
+  .btn-danger:hover {
+    background: var(--danger-dim);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.75rem; }
+
+  /* ---- Sidebar nav ---- */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6875rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-ink-2);
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .nav-item:hover {
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+  }
+  .nav-item[data-active="true"] {
+    background: var(--accent-dim);
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  /* ---- Fields ---- */
+  .field {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.875rem;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--color-paper-2);
+    border: 1.5px solid var(--color-line-strong);
+    border-radius: var(--radius);
+    color: var(--color-ink);
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .field:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .field::placeholder { color: var(--color-ink-3); }
+
+  /* ---- Badges (billable / non-billable / no-rate / warning) ---- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 999px; }
+  .badge-bill { color: var(--gold); background: var(--gold-dim); border-color: var(--gold-line); }
+  .badge-bill .dot { background: var(--gold); }
+  .badge-non { color: var(--steel); background: var(--steel-dim); border-color: var(--steel-line); }
+  .badge-non .dot { border: 1.5px solid var(--steel); }
+  .badge-norate { color: var(--brass-ink); background: var(--brass-dim); border-color: var(--brass-line); }
+  .badge-warn { color: var(--danger); background: var(--danger-dim); border-color: var(--danger-line); }
+
+  /* ---- Billable split bar ---- */
+  .split {
+    display: flex;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--color-surface-3);
+  }
+  .split > i { display: block; height: 100%; }
+  .split .bill { background: var(--accent); }
+  .split .non { background: var(--steel); opacity: 0.85; }
+
+  /* ---- Running-timer bar (dark dock, per func.html) ---- */
+  .timerbar {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.85rem 1.25rem;
+    background: var(--color-ink);
+    color: var(--color-on-dark);
+    border-bottom: 1px solid var(--color-line);
+  }
+  .timerbar-idle {
+    background: var(--color-paper-2);
+    color: var(--color-ink-2);
+    box-shadow: inset 3px 0 0 var(--color-line-strong);
+  }
+}
+
+/* ---- Intentional motion ---- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(89, 199, 193, 0.55); }
+  70% { box-shadow: 0 0 0 8px rgba(89, 199, 193, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(89, 199, 193, 0); }
+}
+.live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--d-teal);
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .live-dot { animation: none; }
 }
