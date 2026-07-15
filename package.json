@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verify": "node scripts/verify.mjs run",
-    "verify:snapshot": "tsx scripts/verify-invoice-snapshot.mts"
+    "verify:snapshot": "tsx scripts/verify-invoice-snapshot.mts",
+    "paddle:setup": "node scripts/paddle-setup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
