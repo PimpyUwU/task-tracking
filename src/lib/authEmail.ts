@@ -70,9 +70,14 @@ export function verifyHookSignature(
 /**
  * Build the activation link that redeems the token at our own /auth/confirm
  * route (which calls verifyOtp). Mirrors the query params that route reads.
+ *
+ * The base is our own app origin (`AUTH_EMAIL_SITE_URL`), NOT the hook's
+ * `site_url`: the latter reflects Supabase's "Site URL" setting, which if left
+ * as the project URL yields a link that hits the Supabase gateway ("No API key
+ * found") instead of this app's /auth/confirm route.
  */
 export function buildConfirmUrl(data: SendEmailHookPayload["email_data"]): string {
-  const base = data.site_url.replace(/\/$/, "");
+  const base = (process.env.AUTH_EMAIL_SITE_URL || data.site_url).replace(/\/$/, "");
   const params = new URLSearchParams({
     token_hash: data.token_hash,
     type: data.email_action_type,
