@@ -3,9 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
 // Public routes that do not require an authenticated session.
-// `/api/paddle` is the server-to-server Paddle webhook — it authenticates via
-// its own HMAC signature, so it must bypass the session-redirect guard.
-const PUBLIC_PATHS = ["/login", "/auth", "/welcome", "/api/paddle"];
+// `/api/paddle` (Paddle webhook) and `/api/auth` (Supabase Send Email hook) are
+// server-to-server endpoints — each authenticates via its own signature, so
+// they must bypass the session-redirect guard.
+const PUBLIC_PATHS = ["/login", "/auth", "/welcome", "/api/paddle", "/api/auth"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

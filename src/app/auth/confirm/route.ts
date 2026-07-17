@@ -2,9 +2,9 @@ import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// Verifies the token from the activation email that n8n/Gmail delivered.
-// Supabase's "Send Email" hook routes the mail through n8n, but the token is
-// still a real Supabase token — we redeem it here with verifyOtp().
+// Verifies the token from the activation email delivered by our own Next.js
+// backend (Supabase "Send Email" hook → /api/auth/send-email → Resend). The
+// token is a real Supabase token — we redeem it here with verifyOtp().
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");

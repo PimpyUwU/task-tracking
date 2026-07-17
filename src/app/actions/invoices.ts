@@ -10,6 +10,7 @@ import {
   type InvoiceDraft,
 } from "@/lib/invoice";
 import { renderInvoiceDocx, DOCX_MIME } from "@/lib/docx";
+import { renderInvoicePdf } from "@/lib/invoicePdf";
 import { buildDefaultTemplateDocx } from "@/lib/defaultTemplate";
 import { track } from "@/lib/analytics";
 import { assertCanInvoice } from "@/lib/plan";
@@ -88,34 +89,6 @@ function templateData(
       amount: formatMoney(l.amount, draft.currency),
     })),
   };
-}
-
-/**
- * Convert a filled .docx to PDF by POSTing it to the n8n webhook (which fronts
- * a private Gotenberg/LibreOffice). Gated on env: if unconfigured the invoice
- * simply ships as .docx only. Never throws — PDF is best-effort.
- */
-async function convertToPdf(docx: Buffer, filename: string): Promise<Buffer | null> {
-  const webhook = process.env.N8N_INVOICE_PDF_WEBHOOK_URL;
-  if (!webhook) return null;
-  try {
-    const form = new FormData();
-    form.append(
-      "file",
-      new Blob([new Uint8Array(docx)], { type: DOCX_MIME }),
-      filename,
-    );
-    const headers: Record<string, string> = {};
-    const token = process.env.N8N_WEBHOOK_TOKEN;
-    if (token) headers[process.env.N8N_WEBHOOK_HEADER || "Authorization"] = token;
-
-    const res = await fetch(webhook, { method: "POST", headers, body: form });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    return buf.length > 0 ? buf : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function generateInvoice(formData: FormData) {
@@ -286,13 +259,25 @@ export async function generateInvoice(formData: FormData) {
       .upload(docxPath, docxBuf, { contentType: DOCX_MIME, upsert: true });
     if (docxUpErr) throw new Error(docxUpErr.message);
 
+    // Native PDF (send-to-client format), rendered in-process from the draft
+    // data — no external service. Best-effort: a PDF failure must not cost the
+    // user their DOCX, which is already uploaded above.
     let pdfPath: string | null = null;
-    const pdfBuf = await convertToPdf(docxBuf, `${invoiceNumber}.docx`);
-    if (pdfBuf) {
-      pdfPath = `${user.id}/${invoiceId}.pdf`;
-      await supabase.storage
+    try {
+      const pdfBuf = await renderInvoicePdf(draft, {
+        invoiceNumber,
+        issuedDate,
+        dueDate,
+        projectName,
+        notes,
+      });
+      const candidate = `${user.id}/${invoiceId}.pdf`;
+      const { error: pdfUpErr } = await supabase.storage
         .from(INVOICE_BUCKET)
-        .upload(pdfPath, pdfBuf, { contentType: PDF_MIME, upsert: true });
+        .upload(candidate, pdfBuf, { contentType: PDF_MIME, upsert: true });
+      if (!pdfUpErr) pdfPath = candidate;
+    } catch {
+      pdfPath = null;
     }
 
     await supabase

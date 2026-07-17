@@ -13,6 +13,7 @@
     "paddle:setup": "node scripts/paddle-setup.mjs"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "docxtemplater": "^3.69.0",
