@@ -342,3 +342,119 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .rise, .live-dot { animation: none; }
 }
+
+/* ============================================================
+   Landing (/welcome) — scroll choreography
+   Masked hero reveal, IO-driven rises, marquee, sticky story
+   stack, animated meters. All gated on prefers-reduced-motion.
+   ============================================================ */
+
+html { scroll-behavior: smooth; }
+
+/* Hero headline: each line rises out of an overflow mask on load. */
+.hero-line { display: block; overflow: hidden; }
+.hero-line > span {
+  display: block;
+  animation: hero-rise 950ms cubic-bezier(0.19, 1, 0.22, 1) both;
+  animation-delay: var(--hl, 0ms);
+}
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(105%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scroll reveal (added by <Reveal>): rise + fade with optional stagger. */
+.io {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--rv, 0ms);
+}
+.io-in { opacity: 1; transform: none; }
+
+/* Hero preview card: gentle parallax lift as the hero scrolls away. */
+@supports (animation-timeline: view()) {
+  .hero-card {
+    animation: hero-drift linear both;
+    animation-timeline: view();
+    animation-range: cover 30% cover 100%;
+  }
+  @keyframes hero-drift {
+    from { transform: translateY(0); }
+    to { transform: translateY(-28px); }
+  }
+}
+
+/* Mono ticker strip between hairlines. */
+.marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+.marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  width: max-content;
+  padding-right: 2.5rem;
+  animation: marquee 38s linear infinite;
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+/* The Loop: sticky story stack (Apple-style card pile) on desktop. */
+.stack { display: grid; gap: 1.25rem; }
+@media (min-width: 1024px) {
+  .stack { gap: 2.5rem; }
+  .stack-card {
+    position: sticky;
+    top: calc(84px + var(--i, 0) * 18px);
+    box-shadow: 0 -20px 44px -30px rgba(15, 26, 28, 0.35);
+  }
+}
+
+/* Billable meter that fills when revealed (widths via CSS vars). */
+.meter { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--color-surface-3); }
+.meter > i { display: block; height: 100%; width: 0; transition: width 1100ms cubic-bezier(0.2, 0.7, 0.2, 1) 250ms; }
+.meter .bill { background: var(--accent); }
+.meter .non { background: var(--steel); opacity: 0.85; }
+.io-in .meter .bill { width: var(--w-bill, 0%); }
+.io-in .meter .non { width: var(--w-non, 0%); }
+
+/* Receipt-style dotted leader between a label and an amount. */
+.leader {
+  flex: 1;
+  min-width: 1.5rem;
+  border-bottom: 2px dotted var(--color-line-strong);
+  transform: translateY(-0.3em);
+  margin: 0 0.55rem;
+}
+
+/* "Rates locked" stamp on the invoice vignette. */
+.stamp {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass-ink);
+  border: 1.5px solid var(--brass-line);
+  background: var(--brass-dim);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  transform: rotate(-6deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hero-line > span, .marquee-track { animation: none; }
+  .io { opacity: 1; transform: none; transition: none; }
+  .meter > i { transition: none; }
+  .io .meter .bill, .meter .bill { width: var(--w-bill, 0%); }
+  .io .meter .non, .meter .non { width: var(--w-non, 0%); }
+  @supports (animation-timeline: view()) {
+    .hero-card { animation: none; }
+  }
+}
