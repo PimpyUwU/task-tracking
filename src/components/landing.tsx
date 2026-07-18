@@ -7,19 +7,20 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { motion } from "motion/react";
 
 /**
  * Motion primitives for the marketing landing page (/welcome).
- * All scroll effects are IntersectionObserver-driven and degrade to static
- * content under prefers-reduced-motion (handled in globals.css for the CSS
- * side, and checked here for the JS side).
+ * Scroll entrances ride motion's whileInView springs (reduced motion is
+ * handled by the MotionConfig in the page's AuthOverlayProvider); the
+ * remaining bespoke effects check prefers-reduced-motion themselves.
  */
 
 const reducedMotion = () =>
   typeof window !== "undefined" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Fades + rises children into view once, when scrolled into the viewport. */
+/** Spring-rises children into view once, when scrolled into the viewport. */
 export function Reveal({
   children,
   delay = 0,
@@ -29,36 +30,23 @@ export function Reveal({
   delay?: number;
   className?: string;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // Already in view — or above it (anchor jump, scroll-up) — reveal now.
-    // The class lands after first paint, so the entrance still transitions.
-    if (el.getBoundingClientRect().top < window.innerHeight * 0.92) {
-      el.classList.add("io-in");
-      return;
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.add("io-in");
-          io.disconnect();
-        }
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -6% 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  const [seen, setSeen] = useState(false);
   return (
-    <div
-      ref={ref}
-      className={`io ${className}`}
-      style={{ "--rv": `${delay}ms` } as CSSProperties}
+    <motion.div
+      className={className}
+      // Styling hook (e.g. the billable meters fill once revealed).
+      data-seen={seen || undefined}
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      // The huge top margin means anything the user has already scrolled
+      // past (anchor jumps, End key, fast scrollbar drags can skip the
+      // viewport entirely between checks) still counts as "seen".
+      viewport={{ once: true, amount: 0.15, margin: "9999px 0px -6% 0px" }}
+      onViewportEnter={() => setSeen(true)}
+      transition={{ type: "spring", stiffness: 120, damping: 21, mass: 0.9, delay: delay / 1000 }}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -106,7 +94,8 @@ export function CountUp({
         };
         requestAnimationFrame(tick);
       },
-      { threshold: 0.4 },
+      // Top margin: still fires for numbers the user scrolled straight past.
+      { threshold: 0.4, rootMargin: "9999px 0px 0px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -158,7 +147,7 @@ export function TimerDock({
       <span className="num font-semibold text-d-brass text-[13px] ml-auto">
         +${earned.toFixed(2)}
       </span>
-      <span className="btn btn-teal btn-sm">Stop</span>
+      <span className="btn btn-teal btn-sm pointer-events-none select-none" aria-hidden>Stop</span>
     </div>
   );
 }
