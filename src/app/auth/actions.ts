@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
 import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/authProviders";
+import { validatePassword } from "@/lib/passwordPolicy";
 
 export type AuthState = { error?: string; message?: string };
 
@@ -36,8 +37,13 @@ export async function signUp(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || password.length < 6) {
-    return { error: "Enter an email and a password of at least 6 characters." };
+  if (!email) {
+    return { error: "Email is required." };
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return { error: passwordError };
   }
 
   const supabase = await createClient();

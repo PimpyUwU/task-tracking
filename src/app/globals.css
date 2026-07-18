@@ -742,6 +742,52 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .auth-field:focus-within > svg { color: var(--accent); }
 .auth-input { padding-left: 2.4rem; }
 
+/* ---- Sign-up password strength meter ---- */
+.auth-pwbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.auth-pwbar > span {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 200ms ease;
+}
+/* Fill segments left-to-right up to the number of satisfied rules, tinting
+   from weak → strong as more rules pass. */
+.auth-pwbar[data-strength="1"] > span:nth-child(-n + 1),
+.auth-pwbar[data-strength="2"] > span:nth-child(-n + 2),
+.auth-pwbar[data-strength="3"] > span:nth-child(-n + 3),
+.auth-pwbar[data-strength="4"] > span:nth-child(-n + 4) {
+  background: var(--danger);
+}
+.auth-pwbar[data-strength="3"] > span:nth-child(-n + 3),
+.auth-pwbar[data-strength="4"] > span:nth-child(-n + 4) {
+  background: #d99a2b;
+}
+.auth-pwbar[data-strength="4"] > span {
+  background: var(--accent);
+}
+.auth-pwrules {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.15rem 0.9rem;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.auth-pwrules li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: color 160ms ease;
+}
+.auth-pwrules li[data-on="true"] { color: var(--accent); }
+.auth-pwrules li > span { width: 0.75rem; text-align: center; }
+
 /* ---- "or continue with" divider ---- */
 .auth-divider {
   display: flex;
@@ -762,7 +808,7 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 /* ---- OAuth provider buttons ---- */
 .auth-social {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 0.5rem;
 }
 .auth-social form { display: flex; }

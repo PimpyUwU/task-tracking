@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import {
   signIn,
   signUp,
   signInWithProvider,
   type AuthState,
 } from "@/app/auth/actions";
+import { PASSWORD_MIN_LENGTH, evaluatePassword } from "@/lib/passwordPolicy";
 
 const initial: AuthState = {};
 
@@ -82,11 +83,16 @@ export function AuthForm({
   next?: string;
 }) {
   const [mode, setMode] = useState<"in" | "up">(initialMode);
+  const [password, setPassword] = useState("");
   const action = mode === "in" ? signIn : signUp;
   const [state, formAction, pending] = useActionState(action, initial);
   const t = copy[mode];
   // Show the redirect error until the user submits the form themselves.
   const error = state.error ?? (state === initial ? initialError : undefined);
+
+  // Live checklist for sign-up. Mirrors the server's authoritative policy.
+  const checks = useMemo(() => evaluatePassword(password), [password]);
+  const passedCount = checks.filter((c) => c.passed).length;
 
   return (
     <div className="auth-formbox">
@@ -158,13 +164,29 @@ export function AuthForm({
               type="password"
               autoComplete={mode === "in" ? "current-password" : "new-password"}
               required
-              minLength={mode === "up" ? 6 : undefined}
+              minLength={mode === "up" ? PASSWORD_MIN_LENGTH : undefined}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="field auth-input"
               placeholder="••••••••"
             />
           </div>
           {mode === "up" && (
-            <p className="num text-[11px] text-ink-3 mt-1.5">At least 6 characters</p>
+            <div className="auth-pwmeter mt-2.5" aria-live="polite">
+              <div className="auth-pwbar" data-strength={passedCount}>
+                {checks.map((c) => (
+                  <span key={c.id} data-on={c.passed} />
+                ))}
+              </div>
+              <ul className="auth-pwrules num">
+                {checks.map((c) => (
+                  <li key={c.id} data-on={c.passed}>
+                    <span aria-hidden>{c.passed ? "✓" : "•"}</span>
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
 
