@@ -1,7 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Wordmark } from "@/components/Sidebar";
+import { Wordmark } from "@/components/Wordmark";
 import { Reveal, CountUp, TimerDock } from "@/components/landing";
+import {
+  AuthAside,
+  AuthCollapse,
+  AuthHide,
+  AuthOverlayProvider,
+  AuthSwap,
+  AuthTrigger,
+  HeroAuthCard,
+} from "@/components/auth-overlay";
 
 export const metadata: Metadata = {
   title: "FluxWork — every billable minute, already on the invoice",
@@ -27,22 +36,27 @@ const Shell = ({ children, className = "" }: { children: React.ReactNode; classN
 
 export default function WelcomePage() {
   return (
-    <div className="min-h-screen overflow-x-clip">
+    <AuthOverlayProvider>
+      <div className="min-h-screen overflow-x-clip">
       {/* ── Nav ─────────────────────────────────────────────────────── */}
       <nav
         className="sticky top-0 z-50 border-b border-line"
-        style={{ background: "rgba(238,241,241,0.86)", backdropFilter: "blur(10px)" }}
+        style={{
+          background: "rgba(238,241,241,0.86)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+        }}
       >
         <Shell className="flex items-center gap-8 h-16">
           <Link href="/welcome"><Wordmark /></Link>
-          <div className="hidden md:flex gap-7 text-[0.9rem] text-ink-2 ml-2">
+          <AuthHide className="hidden md:flex gap-7 text-[0.9rem] text-ink-2 ml-2">
             <a href="#loop" className="hover:text-ink transition-colors">The loop</a>
             <a href="#features" className="hover:text-ink transition-colors">Features</a>
             <a href="#pricing" className="hover:text-ink transition-colors">Pricing</a>
-          </div>
+          </AuthHide>
           <div className="ml-auto flex items-center gap-4">
-            <Link href="/login" className="text-[0.9rem] font-semibold hover:text-accent transition-colors">Sign in</Link>
-            <Link href="/login" className="btn btn-accent">Start free <Arrow /></Link>
+            <AuthTrigger mode="in" className="text-[0.9rem] font-semibold hover:text-accent transition-colors auth-textlink">Sign in</AuthTrigger>
+            <AuthTrigger mode="up" className="btn btn-accent">Start free <Arrow /></AuthTrigger>
           </div>
         </Shell>
       </nav>
@@ -50,36 +64,36 @@ export default function WelcomePage() {
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <header className="relative">
         <Shell className="grid lg:grid-cols-[1.02fr_0.98fr] gap-12 lg:gap-16 items-center pt-16 pb-20 lg:pt-24 lg:pb-28">
-          <div>
-            <p className="label text-accent mb-6 hero-line" style={{ letterSpacing: "0.14em" }}>
-              <span style={{ "--hl": "0ms" } as React.CSSProperties}>For solo freelancers</span>
+          {/* Headline column — rebuilds into the dark login editorial panel */}
+          <AuthSwap back={<AuthAside hero />}>
+            <p className="label text-accent mb-6 hero-item" style={{ letterSpacing: "0.14em", "--hl": "0ms" } as React.CSSProperties}>
+              For solo freelancers
             </p>
             <h1 className="serif" style={{ fontSize: "clamp(46px,7vw,84px)", lineHeight: 1.02, letterSpacing: "-0.012em" }}>
               <span className="hero-line"><span style={{ "--hl": "90ms" } as React.CSSProperties}>Every billable</span></span>
               <span className="hero-line"><span style={{ "--hl": "180ms" } as React.CSSProperties}>minute, <em className="italic text-accent">already</em></span></span>
               <span className="hero-line"><span style={{ "--hl": "270ms" } as React.CSSProperties}><em className="italic text-accent">on the invoice.</em></span></span>
             </h1>
-            <div className="hero-line">
-              <p className="text-ink-2 mt-7 mb-9" style={{ fontSize: "clamp(16px,1.4vw,19px)", maxWidth: "44ch", "--hl": "380ms" } as React.CSSProperties}>
-                FluxWork separates billable from non-billable time and turns it straight into a
-                correct, sendable invoice — the loop Toggl and Harvest leave open.
-              </p>
+            <p className="text-ink-2 mt-7 mb-9 hero-item" style={{ fontSize: "clamp(16px,1.4vw,19px)", maxWidth: "44ch", "--hl": "380ms" } as React.CSSProperties}>
+              FluxWork separates billable from non-billable time and turns it straight into a
+              correct, sendable invoice — the loop Toggl and Harvest leave open.
+            </p>
+            <div className="flex flex-wrap gap-3 hero-item" style={{ "--hl": "460ms" } as React.CSSProperties}>
+              <AuthTrigger mode="up" className="btn btn-accent" style={{ fontSize: 15, padding: "13px 22px" }}>Start free <Arrow /></AuthTrigger>
+              <a href="#loop" className="btn" style={{ fontSize: 15, padding: "13px 22px" }}>See the loop</a>
             </div>
-            <div className="hero-line">
-              <div className="flex flex-wrap gap-3" style={{ "--hl": "460ms" } as React.CSSProperties}>
-                <Link href="/login" className="btn btn-accent" style={{ fontSize: 15, padding: "13px 22px" }}>Start free <Arrow /></Link>
-                <a href="#loop" className="btn" style={{ fontSize: 15, padding: "13px 22px" }}>See the loop</a>
-              </div>
-            </div>
-            <div className="hero-line">
-              <p className="mt-5 text-[13px] text-ink-2 flex items-center gap-2" style={{ "--hl": "540ms" } as React.CSSProperties}>
-                <span className="inline-block h-[7px] w-[7px] rounded-full bg-gold" /> Free plan · no card needed · your data stays yours
-              </p>
-            </div>
-          </div>
+            <p className="mt-5 text-[13px] text-ink-2 flex items-center gap-2 hero-item" style={{ "--hl": "540ms" } as React.CSSProperties}>
+              <span className="inline-block h-[7px] w-[7px] rounded-full bg-gold" /> Free plan · no card needed · your data stays yours
+            </p>
+          </AuthSwap>
 
-          {/* App preview — live, counting, ticking */}
-          <Reveal delay={250} className="hero-card">
+          {/* App preview — live, counting, ticking. Flips into the sign-in
+              form in place when any auth CTA is clicked. */}
+          {/* hero-card (scroll-driven drift) lives on an inner wrapper so it
+              doesn't override the Reveal entrance transform on the same box. */}
+          <Reveal delay={250}>
+            <div className="hero-card">
+            <HeroAuthCard>
             <div className="panel overflow-hidden" style={{ boxShadow: "0 28px 56px -30px rgba(15,26,28,0.32)" }} aria-label="FluxWork app preview">
               <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line" style={{ background: "rgba(238,241,241,0.5)" }}>
                 <Wordmark compact />
@@ -119,15 +133,20 @@ export default function WelcomePage() {
               </div>
               <TimerDock />
             </div>
+            </HeroAuthCard>
+            </div>
           </Reveal>
         </Shell>
       </header>
 
+      {/* Everything below the hero collapses away while login is open —
+          the page itself becomes the login page. */}
+      <AuthCollapse>
       {/* ── Ticker strip ─────────────────────────────────────────────── */}
       <div className="border-y border-line bg-paper-2 py-3.5" aria-hidden>
         <div className="marquee">
           <div className="marquee-track">
-            {[0, 1].map((dup) => (
+            {[0, 1, 2, 3].map((dup) => (
               <div key={dup} className="flex items-center gap-10 num text-[11.5px] tracking-[0.14em] uppercase text-ink-2">
                 {[
                   "Built in the open",
@@ -139,7 +158,7 @@ export default function WelcomePage() {
                   "Launching on Product Hunt · Show HN · Indie Hackers",
                 ].map((t) => (
                   <span key={t} className="flex items-center gap-10 whitespace-nowrap">
-                    {t}<span className="h-[5px] w-[5px] rounded-full bg-line-strong inline-block" style={{ background: "var(--line-strong)" }} />
+                    {t}<span className="h-[5px] w-[5px] rounded-full bg-line-strong inline-block" />
                   </span>
                 ))}
               </div>
@@ -356,7 +375,7 @@ export default function WelcomePage() {
                     <li key={f} className="flex gap-2.5 text-[14.5px]"><Check color="var(--gold)" />{f}</li>
                   ))}
                 </ul>
-                <Link href="/login" className="btn w-full justify-center mt-auto">Start free</Link>
+                <AuthTrigger mode="up" className="btn w-full justify-center mt-auto">Start free</AuthTrigger>
               </div>
             </Reveal>
             <Reveal delay={110}>
@@ -371,7 +390,7 @@ export default function WelcomePage() {
                     <li key={f} className="flex gap-2.5 text-[14.5px]"><Check color="var(--d-teal)" />{f}</li>
                   ))}
                 </ul>
-                <Link href="/login" className="btn btn-teal w-full justify-center mt-auto">Go Pro — $90/yr</Link>
+                <AuthTrigger mode="up" className="btn btn-teal w-full justify-center mt-auto">Go Pro — $90/yr</AuthTrigger>
               </div>
             </Reveal>
           </div>
@@ -393,7 +412,7 @@ export default function WelcomePage() {
             <p className="text-on-dark/70 mx-auto mb-8" style={{ maxWidth: "52ch", fontSize: 17 }}>
               Track your next hour, watch it become an invoice, and get paid. Free to start — no card, no lock-in.
             </p>
-            <Link href="/login" className="btn btn-teal" style={{ fontSize: 16, padding: "15px 26px" }}>Start free <Arrow /></Link>
+            <AuthTrigger mode="up" className="btn btn-teal" style={{ fontSize: 16, padding: "15px 26px" }}>Start free <Arrow /></AuthTrigger>
           </section>
         </Reveal>
       </Shell>
@@ -406,11 +425,13 @@ export default function WelcomePage() {
             <a href="#loop" className="hover:text-ink">The loop</a>
             <a href="#features" className="hover:text-ink">Features</a>
             <a href="#pricing" className="hover:text-ink">Pricing</a>
-            <Link href="/login" className="hover:text-ink">Sign in</Link>
+            <AuthTrigger mode="in" className="hover:text-ink auth-textlink">Sign in</AuthTrigger>
           </div>
           <span>© 2026 FluxWork</span>
         </Shell>
       </footer>
-    </div>
+      </AuthCollapse>
+      </div>
+    </AuthOverlayProvider>
   );
 }

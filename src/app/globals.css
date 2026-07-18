@@ -349,7 +349,14 @@ body {
    stack, animated meters. All gated on prefers-reduced-motion.
    ============================================================ */
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Anchor jumps clear the sticky nav. */
+  scroll-padding-top: 84px;
+  /* No visible root scrollbar — the page still scrolls, the chrome goes. */
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 /* Hero headline: each line rises out of an overflow mask on load. */
 .hero-line { display: block; overflow: hidden; }
@@ -363,16 +370,19 @@ html { scroll-behavior: smooth; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Scroll reveal (added by <Reveal>): rise + fade with optional stagger. */
-.io {
-  opacity: 0;
-  transform: translateY(26px);
-  transition:
-    opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: var(--rv, 0ms);
+/* Hero eyebrow / copy / CTA rows: same staggered rise, but without the
+   overflow mask — so button hover lift and focus rings never get clipped. */
+.hero-item {
+  animation: hero-item-rise 800ms cubic-bezier(0.19, 1, 0.22, 1) both;
+  animation-delay: var(--hl, 0ms);
 }
-.io-in { opacity: 1; transform: none; }
+@keyframes hero-item-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Scroll reveals are spring-driven by <Reveal> (motion/react); it stamps
+   data-seen on its container for dependent effects like the meters below. */
 
 /* Hero preview card: gentle parallax lift as the hero scrolls away. */
 @supports (animation-timeline: view()) {
@@ -392,6 +402,8 @@ html { scroll-behavior: smooth; }
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
 }
+/* Four copies of the strip; one loop advances exactly one copy (25%), so
+   the belt stays seamless even on viewports wider than a single copy. */
 .marquee-track {
   display: flex;
   align-items: center;
@@ -401,7 +413,7 @@ html { scroll-behavior: smooth; }
   animation: marquee 38s linear infinite;
 }
 @keyframes marquee {
-  to { transform: translateX(-50%); }
+  to { transform: translateX(-25%); }
 }
 
 /* The Loop: sticky story stack (Apple-style card pile) on desktop. */
@@ -420,8 +432,8 @@ html { scroll-behavior: smooth; }
 .meter > i { display: block; height: 100%; width: 0; transition: width 1100ms cubic-bezier(0.2, 0.7, 0.2, 1) 250ms; }
 .meter .bill { background: var(--accent); }
 .meter .non { background: var(--steel); opacity: 0.85; }
-.io-in .meter .bill { width: var(--w-bill, 0%); }
-.io-in .meter .non { width: var(--w-non, 0%); }
+[data-seen] .meter .bill { width: var(--w-bill, 0%); }
+[data-seen] .meter .non { width: var(--w-non, 0%); }
 
 /* Receipt-style dotted leader between a label and an amount. */
 .leader {
@@ -449,12 +461,401 @@ html { scroll-behavior: smooth; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .hero-line > span, .marquee-track { animation: none; }
-  .io { opacity: 1; transform: none; transition: none; }
+  .hero-line > span, .hero-item, .marquee-track { animation: none; }
   .meter > i { transition: none; }
-  .io .meter .bill, .meter .bill { width: var(--w-bill, 0%); }
-  .io .meter .non, .meter .non { width: var(--w-non, 0%); }
+  .meter .bill { width: var(--w-bill, 0%); }
+  .meter .non { width: var(--w-non, 0%); }
   @supports (animation-timeline: view()) {
     .hero-card { animation: none; }
   }
+}
+
+/* ============================================================
+   Auth transition — the hero rebuilds in place.
+   The live app-preview card and the headline column are two-faced
+   grid cells; motion/react springs crossfade the faces (opacity /
+   translate / scale only — no 3D rotation, so text stays crisp).
+   CSS here is layout + pre-hydration state; inert handles input.
+   ============================================================ */
+
+:root {
+  --auth-ease: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out — decisive settle */
+  --auth-dur: 560ms;
+}
+
+/* Two faces stacked in one grid cell. The container keeps the taller
+   face's height, so nothing reflows during the swap. */
+.auth-flip { display: grid; }
+.auth-face { grid-area: 1 / 1; min-width: 0; }
+
+/* Back face: the auth form. Hidden until hydration; motion owns opacity
+   and transform from then on. */
+.auth-face-auth {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(22px, 2.4vw, 34px);
+  opacity: 0;
+  box-shadow: 0 28px 56px -30px rgba(15, 26, 28, 0.32);
+}
+
+/* Close pill floats in the card's corner. */
+.auth-face-auth .auth-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+}
+
+/* ---- Headline column swap: landing copy ⇄ dark editorial panel ---- */
+.auth-swap { display: grid; }
+.auth-swap > * { grid-area: 1 / 1; min-width: 0; }
+.auth-swap-back { opacity: 0; }
+/* On small screens the dark panel is skipped — the headline just recedes
+   above the swapped form card. */
+@media (max-width: 1023.98px) {
+  .auth-swap-back { display: none; }
+}
+
+/* The dark aside as the hero back face: a rounded panel filling the cell. */
+.auth-aside-hero {
+  border-radius: var(--radius-card);
+  height: 100%;
+  box-shadow: 0 28px 56px -30px rgba(15, 26, 28, 0.4);
+}
+
+/* ---- Below-hero collapse: the rest of the landing folds away ---- */
+.auth-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--auth-dur) var(--auth-ease),
+    opacity 360ms ease;
+}
+/* `clip` (not `hidden`): hidden would make this a scroll container and
+   silently kill the sticky story-stack cards inside. min-width: 0 keeps the
+   marquee's max-content track from inflating this grid item's min size. */
+.auth-collapse > div { min-height: 0; min-width: 0; overflow: clip; }
+.auth-collapse[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+/* Nav section links fade away while login is open — their targets are
+   collapsed, so they'd otherwise scroll nowhere and mangle the URL. */
+.auth-hide { transition: opacity 320ms ease; }
+.auth-hide[data-hidden="true"] { opacity: 0; pointer-events: none; }
+
+/* Content cascade on the standalone /login page. */
+@keyframes auth-rise-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.auth-shell .auth-aside-top { animation: auth-rise-in 600ms var(--auth-ease) 80ms both; }
+.auth-shell .auth-aside-mid { animation: auth-rise-in 640ms var(--auth-ease) 170ms both; }
+.auth-shell .auth-aside-list { animation: auth-rise-in 640ms var(--auth-ease) 260ms both; }
+.auth-shell .auth-formbox { animation: auth-rise-in 620ms var(--auth-ease) 140ms both; }
+
+/* Standalone /login — the identical full-screen page, direct-loaded. */
+.auth-standalone {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--paper);
+}
+.auth-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  animation: auth-enter 480ms ease both;
+}
+@keyframes auth-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- Split content: dark editorial column · form column ---- */
+.auth-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  height: 100%;
+  min-height: inherit;
+}
+@media (min-width: 820px) {
+  .auth-content { grid-template-columns: minmax(360px, 43%) 1fr; }
+}
+
+/* Dark editorial column with a cursor-following spotlight. */
+.auth-aside {
+  display: none;
+  position: relative;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(28px, 3vw, 46px);
+  background: var(--ink);
+  color: var(--on-dark);
+}
+@media (min-width: 820px) {
+  .auth-aside { display: flex; }
+}
+.auth-aside::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    460px circle at var(--mx, 28%) var(--my, 22%),
+    rgba(89, 199, 193, 0.18),
+    transparent 62%
+  );
+  pointer-events: none;
+  transition: background 120ms linear;
+}
+/* Faint blueprint grid under the spotlight. */
+.auth-aside::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(159, 176, 176, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(159, 176, 176, 0.06) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(90% 70% at 30% 20%, #000, transparent 80%);
+  pointer-events: none;
+}
+.auth-aside > * { position: relative; z-index: 1; }
+.auth-aside-kicker { color: var(--d-teal); }
+.auth-aside-em { color: var(--d-teal); font-style: italic; }
+.auth-aside-body { color: var(--on-dark-mut); }
+.auth-brand { display: inline-flex; }
+
+.auth-aside-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  font-size: 13px;
+  color: var(--on-dark-mut);
+}
+.auth-aside-list li { display: flex; align-items: flex-start; gap: 0.6rem; }
+.auth-tick {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  border-radius: 5px;
+  background: rgba(89, 199, 193, 0.16);
+  border: 1px solid rgba(89, 199, 193, 0.4);
+  position: relative;
+}
+.auth-tick::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  width: 4px;
+  height: 7px;
+  border: solid var(--d-teal);
+  border-width: 0 2px 2px 0;
+  transform: rotate(42deg);
+}
+
+/* Form column. */
+.auth-formwrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(26px, 4.5vw, 52px);
+  overflow-y: auto;
+}
+.auth-formbox { width: 100%; max-width: 380px; margin: 0 auto; }
+.auth-heading { color: var(--ink); }
+
+.auth-topright { position: absolute; top: 16px; right: 16px; z-index: 2; }
+.auth-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 38px;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, transform 160ms ease,
+    background 160ms ease;
+}
+.auth-close:not(.auth-close-wide) { width: 38px; padding: 0; justify-content: center; }
+.auth-close:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+  transform: rotate(90deg);
+}
+.auth-close-wide:hover { transform: translateX(-2px); }
+
+/* ---- Segmented mode control ---- */
+.auth-seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.auth-seg-pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: var(--paper-2);
+  border-radius: 9px;
+  box-shadow: 0 1px 3px rgba(15, 26, 28, 0.14);
+  transition: transform 400ms var(--auth-ease);
+}
+.auth-seg[data-mode="up"] .auth-seg-pill { transform: translateX(100%); }
+.auth-seg button {
+  position: relative;
+  z-index: 1;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color 220ms ease;
+}
+.auth-seg button[data-active="true"] { color: var(--ink); }
+.auth-seg button:hover { color: var(--ink); }
+
+/* ---- Fields with a leading icon ---- */
+.auth-field { position: relative; display: flex; align-items: center; }
+.auth-field > svg {
+  position: absolute;
+  left: 12px;
+  color: var(--ink-3);
+  pointer-events: none;
+  transition: color 160ms ease;
+}
+.auth-field:focus-within > svg { color: var(--accent); }
+.auth-input { padding-left: 2.4rem; }
+/* Reserve room on the right for the reveal toggle so text never runs under it. */
+.auth-input-reveal { padding-right: 2.75rem; }
+
+/* ---- Show / hide password toggle ---- */
+.auth-reveal {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+.auth-reveal:hover { color: var(--ink-2); background: var(--surface-2); }
+.auth-reveal:focus-visible {
+  outline: none;
+  color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.auth-reveal[aria-pressed="true"] { color: var(--accent); }
+
+/* "Forgot password?" — a plain text link aligned to the field's right edge. */
+.auth-forgot {
+  display: block;
+  margin-left: auto;
+  width: fit-content;
+}
+
+/* ---- "or continue with" divider ---- */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--ink-3);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* ---- OAuth provider buttons ---- */
+.auth-social {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.auth-social form { display: flex; }
+.auth-social-btn {
+  gap: 0.4rem;
+  padding-inline: 0.5rem;
+  font-size: 0.8125rem;
+}
+/* On the narrowest cards, drop the labels to keep the row from wrapping. */
+@media (max-width: 360px) {
+  .auth-social-btn span { display: none; }
+}
+
+/* ---- Messages ---- */
+.auth-msg {
+  padding: 0.55rem 0.7rem;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.auth-msg-error {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+
+/* ---- Submit with a nudging arrow ---- */
+.auth-submit { width: 100%; padding-top: 0.8rem; padding-bottom: 0.8rem; }
+.auth-submit .arr { transition: transform 240ms var(--auth-ease); }
+.auth-submit:hover:not(:disabled) .arr { transform: translateX(4px); }
+
+/* Inline text buttons that read like links. (Not `.auth-swap` — that's the
+   hero swap layout container.) In the components layer so Tailwind utilities
+   on individual triggers (font-semibold, hover:text-accent) win. */
+@layer components {
+  .auth-swaplink,
+  .auth-textlink {
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    text-underline-offset: 2px;
+    transition: color 150ms ease;
+  }
+  .auth-swaplink:hover { text-decoration: underline; }
+  /* Context-styled trigger: match surrounding text, don't impose link styling. */
+  .auth-textlink { color: inherit; font-weight: inherit; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-seg-pill,
+  .auth-shell,
+  .auth-collapse { transition: none; animation: none; }
+  .auth-shell .auth-aside-top,
+  .auth-shell .auth-aside-mid,
+  .auth-shell .auth-aside-list,
+  .auth-shell .auth-formbox { animation: none; }
+  .auth-aside::before { display: none; }
+  .auth-close:hover { transform: none; }
 }
