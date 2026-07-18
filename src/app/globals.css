@@ -755,18 +755,16 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
   transition: background 200ms ease;
 }
 /* Fill segments left-to-right up to the number of satisfied rules, tinting
-   from weak → strong as more rules pass. */
+   from weak → strong as more rules pass. Only a full set of passing rules
+   turns the whole bar green. */
 .auth-pwbar[data-strength="1"] > span:nth-child(-n + 1),
-.auth-pwbar[data-strength="2"] > span:nth-child(-n + 2),
-.auth-pwbar[data-strength="3"] > span:nth-child(-n + 3),
-.auth-pwbar[data-strength="4"] > span:nth-child(-n + 4) {
+.auth-pwbar[data-strength="2"] > span:nth-child(-n + 2) {
   background: var(--danger);
 }
-.auth-pwbar[data-strength="3"] > span:nth-child(-n + 3),
-.auth-pwbar[data-strength="4"] > span:nth-child(-n + 4) {
+.auth-pwbar[data-strength="3"] > span:nth-child(-n + 3) {
   background: #d99a2b;
 }
-.auth-pwbar[data-strength="4"] > span {
+.auth-pwbar[data-strength="4"] > span:nth-child(-n + 4) {
   background: var(--accent);
 }
 .auth-pwrules {
