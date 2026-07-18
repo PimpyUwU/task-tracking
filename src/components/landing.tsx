@@ -12,8 +12,8 @@ import { motion } from "motion/react";
 /**
  * Motion primitives for the marketing landing page (/welcome).
  * Scroll entrances ride motion's whileInView springs (reduced motion is
- * handled by the MotionConfig in the page's AuthOverlayProvider); the
- * remaining bespoke effects check prefers-reduced-motion themselves.
+ * handled by the page's MotionConfig reducedMotion="user"); the remaining
+ * bespoke effects check prefers-reduced-motion themselves.
  */
 
 const reducedMotion = () =>

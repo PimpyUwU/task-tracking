@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AuthContent } from "@/components/auth-overlay";
+import { AuthContent } from "@/components/auth-panel";
 
 export const metadata: Metadata = {
   title: "Sign in — FluxWork",
@@ -22,15 +22,15 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; mode?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, mode } = await searchParams;
 
   return (
     <div className="auth-standalone">
       <div className="auth-shell">
         <AuthContent
-          mode="in"
+          mode={mode === "up" ? "up" : "in"}
           initialError={error ? ERRORS[error] : undefined}
           topRight={
             <Link href="/welcome" className="auth-close auth-close-wide">

@@ -480,72 +480,7 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 :root {
   --auth-ease: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out — decisive settle */
-  --auth-dur: 560ms;
 }
-
-/* Two faces stacked in one grid cell. The container keeps the taller
-   face's height, so nothing reflows during the swap. */
-.auth-flip { display: grid; }
-.auth-face { grid-area: 1 / 1; min-width: 0; }
-
-/* Back face: the auth form. Hidden until hydration; motion owns opacity
-   and transform from then on. */
-.auth-face-auth {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(22px, 2.4vw, 34px);
-  opacity: 0;
-  box-shadow: 0 28px 56px -30px rgba(15, 26, 28, 0.32);
-}
-
-/* Close pill floats in the card's corner. */
-.auth-face-auth .auth-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 1;
-}
-
-/* ---- Headline column swap: landing copy ⇄ dark editorial panel ---- */
-.auth-swap { display: grid; }
-.auth-swap > * { grid-area: 1 / 1; min-width: 0; }
-.auth-swap-back { opacity: 0; }
-/* On small screens the dark panel is skipped — the headline just recedes
-   above the swapped form card. */
-@media (max-width: 1023.98px) {
-  .auth-swap-back { display: none; }
-}
-
-/* The dark aside as the hero back face: a rounded panel filling the cell. */
-.auth-aside-hero {
-  border-radius: var(--radius-card);
-  height: 100%;
-  box-shadow: 0 28px 56px -30px rgba(15, 26, 28, 0.4);
-}
-
-/* ---- Below-hero collapse: the rest of the landing folds away ---- */
-.auth-collapse {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition:
-    grid-template-rows var(--auth-dur) var(--auth-ease),
-    opacity 360ms ease;
-}
-/* `clip` (not `hidden`): hidden would make this a scroll container and
-   silently kill the sticky story-stack cards inside. min-width: 0 keeps the
-   marquee's max-content track from inflating this grid item's min size. */
-.auth-collapse > div { min-height: 0; min-width: 0; overflow: clip; }
-.auth-collapse[data-collapsed="true"] {
-  grid-template-rows: 0fr;
-  opacity: 0;
-}
-
-/* Nav section links fade away while login is open — their targets are
-   collapsed, so they'd otherwise scroll nowhere and mangle the URL. */
-.auth-hide { transition: opacity 320ms ease; }
-.auth-hide[data-hidden="true"] { opacity: 0; pointer-events: none; }
 
 /* Content cascade on the standalone /login page. */
 @keyframes auth-rise-in {
@@ -839,9 +774,9 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .auth-submit .arr { transition: transform 240ms var(--auth-ease); }
 .auth-submit:hover:not(:disabled) .arr { transform: translateX(4px); }
 
-/* Inline text buttons that read like links. (Not `.auth-swap` — that's the
-   hero swap layout container.) In the components layer so Tailwind utilities
-   on individual triggers (font-semibold, hover:text-accent) win. */
+/* Inline text buttons/links that read like links. In the components layer so
+   Tailwind utilities on individual triggers (font-semibold, hover:text-accent)
+   win. */
 @layer components {
   .auth-swaplink,
   .auth-textlink {
@@ -861,8 +796,7 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .auth-seg-pill,
-  .auth-shell,
-  .auth-collapse { transition: none; animation: none; }
+  .auth-shell { transition: none; animation: none; }
   .auth-shell .auth-aside-top,
   .auth-shell .auth-aside-mid,
   .auth-shell .auth-aside-list,
