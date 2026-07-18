@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { animate, motion, MotionConfig } from "motion/react";
+import { motion, MotionConfig } from "motion/react";
 import { AuthForm } from "@/components/AuthForm";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -33,56 +33,16 @@ function useAuthOverlay() {
   return ctx;
 }
 
-/* One spring family for the whole auth transition — a decisive, natural
-   settle with zero 3D rotation, so text never goes blurry mid-flight. */
+/* One spring family for the whole auth takeover — a decisive, natural settle
+   with zero 3D rotation, so text never blurs mid-flight. */
 const SWAP = { type: "spring", stiffness: 260, damping: 32, mass: 0.9 } as const;
-
-let scrollAnim: { stop: () => void } | null = null;
-
-/**
- * Spring-glides the page scroll to a target. Starts immediately and rides
- * along document-height changes (the browser clamps out-of-range frames),
- * so collapse/expand and scrolling read as one continuous motion.
- * The user can take over at any time — a wheel or touch cancels it.
- */
-function glideTo(targetY: number) {
-  scrollAnim?.stop();
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    window.scrollTo({ top: targetY, behavior: "instant" });
-    return;
-  }
-  const handOver = () => scrollAnim?.stop();
-  window.addEventListener("wheel", handOver, { once: true, passive: true });
-  window.addEventListener("touchstart", handOver, { once: true, passive: true });
-  scrollAnim = animate(window.scrollY, targetY, {
-    type: "spring",
-    stiffness: 110,
-    damping: 22,
-    mass: 0.9,
-    restDelta: 0.5,
-    // "instant" bypasses the CSS scroll-behavior: smooth on <html>.
-    onUpdate: (v) => window.scrollTo({ top: v, behavior: "instant" }),
-  });
-}
-
-/** Tracks the desktop hero breakpoint (side-by-side hero columns). */
-function useDesktop() {
-  const [desktop, setDesktop] = useState(true);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const update = () => setDesktop(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return desktop;
-}
 
 /**
  * Owns the open/closed state for the in-place login and wires it to the
- * browser: Escape and the Back button close it, and opening shallow-pushes
- * /login so the URL tracks what the page is showing. The landing page itself
- * rebuilds into the login layout — nothing is overlaid.
+ * browser: Escape and the Back button close it, opening shallow-pushes /login
+ * so the URL tracks what's shown, and the body scroll locks while the
+ * full-screen login is up. The landing stays mounted underneath — the login
+ * panel simply slides over it.
  */
 export function AuthOverlayProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -90,17 +50,12 @@ export function AuthOverlayProvider({ children }: { children: ReactNode }) {
   // Mirrors isOpen for event handlers — history.pushState must never run
   // inside a state updater (it re-enters the Next router mid-render).
   const openRef = useRef(false);
-  // Where the user was before opening — restored on close. We drive this
-  // ourselves (scrollRestoration: manual) because the browser's restore
-  // fires while the page is still collapsed and gets clamped.
-  const returnScroll = useRef<number | null>(null);
 
   const open = useCallback((next: Mode) => {
     setMode(next);
     if (!openRef.current) {
-      returnScroll.current = window.scrollY;
-      // Shallow-push /login so the in-place rebuild reads as a navigation:
-      // the URL changes, and Back returns to /welcome (restoring the landing).
+      // Shallow-push /login so the takeover reads as a navigation: the URL
+      // changes, and Back returns to /welcome (restoring the landing).
       window.history.pushState({ fluxAuth: true }, "", "/login");
       openRef.current = true;
     }
@@ -117,23 +72,13 @@ export function AuthOverlayProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // We animate the return scroll ourselves — the browser's own popstate
-  // restore would jump-cut against the expanding page.
-  useEffect(() => {
-    const prev = window.history.scrollRestoration;
-    window.history.scrollRestoration = "manual";
-    return () => {
-      window.history.scrollRestoration = prev;
-    };
-  }, []);
-
   // History traversal keeps the page in sync both ways: Back restores the
-  // landing, Forward onto our pushed /login entry restores the login.
+  // landing, Forward onto our pushed /login entry reopens the login.
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
-      const open = Boolean(e.state?.fluxAuth);
-      openRef.current = open;
-      setIsOpen(open);
+      const next = Boolean(e.state?.fluxAuth);
+      openRef.current = next;
+      setIsOpen(next);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -149,19 +94,23 @@ export function AuthOverlayProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen, close]);
 
-  // On close, glide straight back to where the user was — in parallel with
-  // the sections re-expanding, so there's no pause before the return trip.
+  // Lock the page behind the takeover so a stray scroll can't drift the
+  // landing while the login is up.
   useEffect(() => {
-    if (isOpen) return;
-    const y = returnScroll.current;
-    if (y == null) return;
-    returnScroll.current = null;
-    glideTo(y);
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [isOpen]);
 
   return (
     <MotionConfig reducedMotion="user">
-      <AuthCtx.Provider value={{ isOpen, mode, open, close }}>{children}</AuthCtx.Provider>
+      <AuthCtx.Provider value={{ isOpen, mode, open, close }}>
+        {children}
+        <AuthOverlay />
+      </AuthCtx.Provider>
     </MotionConfig>
   );
 }
@@ -186,177 +135,88 @@ export function AuthTrigger({
   );
 }
 
-/**
- * Wraps everything below the hero. While login is open these sections
- * collapse to zero height and fade out, so the page IS the login page —
- * nav + hero only. Expands back when login closes.
- */
-export function AuthCollapse({ children }: { children: ReactNode }) {
-  const { isOpen } = useAuthOverlay();
-  return (
-    <div className="auth-collapse" data-collapsed={isOpen} inert={isOpen} aria-hidden={isOpen}>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-/** Fades its children out (and makes them inert) while login is open. */
-export function AuthHide({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  const { isOpen } = useAuthOverlay();
-  return (
-    <div className={`auth-hide ${className}`} data-hidden={isOpen} inert={isOpen} aria-hidden={isOpen}>
-      {children}
-    </div>
-  );
-}
+const CloseIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </svg>
+);
 
 /**
- * Two stacked faces in one grid cell: the landing content (children) in
- * front, the login counterpart behind. Opening login spring-crossfades
- * front → back in place, so the column rebuilds without the layout moving.
- * On small screens the back face is skipped — the headline just recedes.
+ * The full-screen split login that slides over the landing when any auth CTA
+ * is clicked — the same design as the standalone /login page. The dark
+ * editorial column enters from the left, the form column from the right, so
+ * the two halves assemble around the form the user is about to fill in.
  */
-export function AuthSwap({
-  children,
-  back,
-  className = "",
-}: {
-  children: ReactNode;
-  back: ReactNode;
-  className?: string;
-}) {
-  const { isOpen } = useAuthOverlay();
-  const desktop = useDesktop();
-  return (
-    <div className={`auth-swap ${className}`} data-open={isOpen}>
-      <motion.div
-        className="auth-swap-front"
-        initial={false}
-        animate={
-          isOpen
-            ? desktop
-              ? { opacity: 0, y: -18, scale: 0.985 }
-              : { opacity: 0.35, y: 0, scale: 1 }
-            : { opacity: 1, y: 0, scale: 1 }
-        }
-        transition={SWAP}
-        inert={isOpen}
-        aria-hidden={isOpen}
-      >
-        {children}
-      </motion.div>
-      <motion.div
-        className="auth-swap-back"
-        initial={false}
-        animate={
-          isOpen && desktop
-            ? { opacity: 1, y: 0, scale: 1 }
-            : { opacity: 0, y: 18, scale: 0.99 }
-        }
-        transition={isOpen ? { ...SWAP, delay: 0.08 } : SWAP}
-        inert={!isOpen}
-        aria-hidden={!isOpen}
-      >
-        {back}
-      </motion.div>
-    </div>
-  );
-}
-
-/**
- * The hero's other shared element: the live app-preview card (server-
- * rendered children) on the front face, the auth form on the back.
- * Clicking any auth CTA swaps the card in place with a spring crossfade.
- */
-export function HeroAuthCard({ children }: { children: ReactNode }) {
+function AuthOverlay() {
   const { isOpen, mode, close } = useAuthOverlay();
-  const ref = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
-  // On open: glide the form into view (top of page on desktop where both
-  // hero columns are visible; the card itself on small screens, where it
-  // sits below the tall headline), then focus the first field once the
-  // swap settles.
+  // Focus the first field once the panel has settled in.
   useEffect(() => {
     if (!isOpen) return;
-    const desktop = window.matchMedia("(min-width: 1024px)").matches;
-    let target = 0;
-    if (!desktop && ref.current) {
-      const r = ref.current.getBoundingClientRect();
-      target = Math.max(
-        0,
-        window.scrollY + r.top - Math.max(24, (window.innerHeight - r.height) / 2),
-      );
-    }
-    glideTo(target);
     const id = window.setTimeout(() => {
-      ref.current?.querySelector<HTMLInputElement>(".auth-face-auth input")?.focus({
+      formRef.current?.querySelector<HTMLInputElement>("input")?.focus({
         preventScroll: true,
       });
-    }, 420);
+    }, 360);
     return () => window.clearTimeout(id);
   }, [isOpen]);
 
   return (
-    <div ref={ref} className="auth-flip" data-open={isOpen}>
-      <motion.div
-        className="auth-face auth-face-preview"
-        initial={false}
-        animate={
-          isOpen
-            ? { opacity: 0, y: -12, scale: 0.965 }
-            : { opacity: 1, y: 0, scale: 1 }
-        }
-        transition={SWAP}
-        inert={isOpen}
-        aria-hidden={isOpen}
-      >
-        {children}
-      </motion.div>
-      <motion.div
-        className="auth-face auth-face-auth panel"
-        initial={false}
-        animate={
-          isOpen
-            ? { opacity: 1, y: 0, scale: 1 }
-            : { opacity: 0, y: 16, scale: 0.975 }
-        }
-        transition={isOpen ? { ...SWAP, delay: 0.07 } : SWAP}
-        inert={!isOpen}
-        aria-hidden={!isOpen}
-        role="region"
-        aria-label="Sign in to FluxWork"
-      >
-        <button type="button" className="auth-close" onClick={close} aria-label="Close sign in">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
-        </button>
-        {/* Keyed on open state too, so every open honors the clicked CTA's
-            mode even if the user switched modes inside the form last time. */}
-        <AuthForm key={`${mode}:${isOpen}`} initialMode={mode} compact />
-      </motion.div>
-    </div>
+    <motion.div
+      className="auth-overlay"
+      initial={false}
+      animate={{ opacity: isOpen ? 1 : 0 }}
+      transition={{ duration: isOpen ? 0.28 : 0.22, ease: "easeOut" }}
+      data-open={isOpen}
+      inert={!isOpen}
+      aria-hidden={!isOpen}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sign in to FluxWork"
+    >
+      <div className="auth-content">
+        <motion.div
+          className="auth-overlay-aside"
+          initial={false}
+          animate={isOpen ? { x: 0, opacity: 1 } : { x: "-4%", opacity: 0 }}
+          transition={SWAP}
+        >
+          <AuthAside brand />
+        </motion.div>
+
+        <motion.div
+          ref={formRef}
+          className="auth-formwrap"
+          initial={false}
+          animate={isOpen ? { x: 0, opacity: 1 } : { x: "4%", opacity: 0 }}
+          transition={isOpen ? { ...SWAP, delay: 0.05 } : SWAP}
+        >
+          <div className="auth-topright">
+            <button
+              type="button"
+              className="auth-close auth-close-wide"
+              onClick={close}
+              aria-label="Close sign in"
+            >
+              <CloseIcon /> Back to site
+            </button>
+          </div>
+          {/* Keyed on mode + open so each open honors the clicked CTA's mode
+              and resets the form state from the previous session. */}
+          <AuthForm key={`${mode}:${isOpen}`} initialMode={mode} />
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }
 
 /**
  * The dark editorial panel of the login design — cursor-following spotlight,
- * blueprint grid, product checklist. Used as the hero headline's back face
- * on /welcome (`hero`) and as the left column of the standalone /login page.
+ * blueprint grid, product checklist. Shared by the in-place overlay and the
+ * standalone /login page's left column.
  */
-export function AuthAside({
-  brand = false,
-  hero = false,
-}: {
-  brand?: boolean;
-  hero?: boolean;
-}) {
+export function AuthAside({ brand = false }: { brand?: boolean }) {
   const onMove = (e: MouseEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     e.currentTarget.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
@@ -364,7 +224,7 @@ export function AuthAside({
   };
 
   return (
-    <aside className={`auth-aside ${hero ? "auth-aside-hero" : ""}`} onMouseMove={onMove}>
+    <aside className="auth-aside" onMouseMove={onMove}>
       {brand && (
         <div className="auth-aside-top">
           <Link href="/welcome" className="auth-brand">
@@ -404,7 +264,8 @@ export function AuthAside({
 
 /**
  * The split layout of the standalone /login page (direct loads, e.g. after
- * sign-out). `topRight` is the "back to site" link.
+ * sign-out). Shares AuthAside + AuthForm with the in-place overlay so the two
+ * experiences are pixel-identical. `topRight` is the "back to site" link.
  */
 export function AuthContent({
   mode = "in",
@@ -413,6 +274,7 @@ export function AuthContent({
 }: {
   mode?: Mode;
   topRight?: ReactNode;
+  /** Error surfaced from a redirect (e.g. ?error=oauth), shown until resubmit. */
   initialError?: string;
 }) {
   return (
