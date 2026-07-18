@@ -5,6 +5,7 @@ import {
   signIn,
   signUp,
   signInWithProvider,
+  resetPassword,
   type AuthState,
 } from "@/app/auth/actions";
 import { PASSWORD_MIN_LENGTH, evaluatePassword } from "@/lib/passwordPolicy";
@@ -83,8 +84,9 @@ export function AuthForm({
   next?: string;
 }) {
   const [mode, setMode] = useState<"in" | "up">(initialMode);
+  const [reset, setReset] = useState(false);
   const [password, setPassword] = useState("");
-  const action = mode === "in" ? signIn : signUp;
+  const action = reset ? resetPassword : mode === "in" ? signIn : signUp;
   const [state, formAction, pending] = useActionState(action, initial);
   const t = copy[mode];
   // Show the redirect error until the user submits the form themselves.
@@ -93,6 +95,76 @@ export function AuthForm({
   // Live checklist for sign-up. Mirrors the server's authoritative policy.
   const checks = useMemo(() => evaluatePassword(password), [password]);
   const passedCount = checks.filter((c) => c.passed).length;
+
+  // Forgot-password view: email-only, sends a recovery link via resetPassword.
+  if (reset) {
+    return (
+      <div className="auth-formbox">
+        <div className="rise">
+          <p className="label mb-3">Reset password</p>
+          <h2
+            className="serif auth-heading"
+            style={{
+              fontSize: compact ? "clamp(26px,2.4vw,32px)" : "clamp(30px,3.6vw,42px)",
+              lineHeight: 1.04,
+            }}
+          >
+            Reset your password
+          </h2>
+          <p className="text-ink-2 mt-2.5 text-[15px]">
+            Enter your email and we&apos;ll send a link to set a new one.
+          </p>
+        </div>
+
+        <form action={formAction} className={`flex flex-col gap-4 ${compact ? "mt-5" : "mt-6"}`}>
+          <div>
+            <label className="label block mb-2" htmlFor="reset-email">
+              Email
+            </label>
+            <div className="auth-field">
+              <MailIcon />
+              <input
+                id="reset-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="field auth-input"
+                placeholder="you@studio.com"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="auth-msg auth-msg-error num text-xs" role="alert">
+              {error}
+            </p>
+          )}
+          {state.message && (
+            <p className="auth-msg num text-xs" role="status">
+              {state.message}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending}
+            className="btn btn-accent auth-submit justify-center mt-1"
+          >
+            {pending ? "Sending…" : "Send reset link"}
+            {!pending && <Arrow />}
+          </button>
+        </form>
+
+        <p className={`text-[12.5px] text-ink-3 leading-relaxed ${compact ? "mt-4" : "mt-6"}`}>
+          Remembered it?{" "}
+          <button type="button" className="auth-swaplink" onClick={() => setReset(false)}>
+            Back to sign in
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-formbox">
@@ -186,6 +258,17 @@ export function AuthForm({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {mode === "in" && (
+            <div className="mt-2 text-right">
+              <button
+                type="button"
+                className="auth-swaplink text-[12.5px]"
+                onClick={() => setReset(true)}
+              >
+                Forgot password?
+              </button>
             </div>
           )}
         </div>

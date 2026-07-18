@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { MouseEvent, ReactNode } from "react";
+import { useCallback, type MouseEvent, type ReactNode } from "react";
 import { AuthForm } from "@/components/AuthForm";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -10,19 +10,55 @@ type Mode = "in" | "up";
 /**
  * The dark editorial panel of the login design — cursor-following spotlight,
  * blueprint grid, product checklist. The left column of the /login page.
+ *
+ * Carries an iPadOS-style pointer via the `ipad-cursor` library, scoped to this
+ * panel: initCursor on enter, disposeCursor on leave, so the OS cursor is only
+ * replaced while the pointer is over the dark column. Elements tagged
+ * `data-cursor="block"` (the logo) make the pointer morph and wrap them, iPad
+ * style. onMove still feeds --lx/--ly (px) to the ambient spotlight glow.
  */
 export function AuthAside({ brand = false }: { brand?: boolean }) {
   const onMove = (e: MouseEvent<HTMLElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
-    e.currentTarget.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    // Pixel coords drive the ambient glow's transform (smooth, GPU-composited
+    // follow), mirroring how the ipad-cursor library eases its own movement.
+    el.style.setProperty("--lx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--ly", `${e.clientY - r.top}px`);
   };
 
+  const onEnter = useCallback(async () => {
+    const { initCursor } = await import("ipad-cursor");
+    initCursor({
+      // Roomier box when the pointer melds into a control (e.g. the logo).
+      blockPadding: 14,
+      enableAutoTextCursor: false,
+      normalStyle: {
+        width: "26px",
+        height: "20px",
+        radius: "999px",
+        background: "rgba(89, 199, 193, 0.14)",
+        border: "1px solid rgba(89, 199, 193, 0.5)",
+        durationPosition: "0.12s",
+      },
+      blockStyle: {
+        radius: "auto",
+        background: "rgba(89, 199, 193, 0.12)",
+        border: "1px solid rgba(89, 199, 193, 0.32)",
+      },
+    });
+  }, []);
+
+  const onLeave = useCallback(async () => {
+    const { disposeCursor } = await import("ipad-cursor");
+    disposeCursor();
+  }, []);
+
   return (
-    <aside className="auth-aside" onMouseMove={onMove}>
+    <aside className="auth-aside" onMouseMove={onMove} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       {brand && (
         <div className="auth-aside-top">
-          <Link href="/welcome" className="auth-brand">
+          <Link href="/welcome" className="auth-brand" data-cursor="block">
             <Wordmark />
           </Link>
         </div>

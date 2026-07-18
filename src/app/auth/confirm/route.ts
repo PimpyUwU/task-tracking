@@ -28,6 +28,12 @@ export async function GET(request: NextRequest) {
       token_hash: tokenHash,
     });
     if (!error) {
+      // A password-recovery token must always land on the set-new-password
+      // screen — never deep-link into the app, or it behaves like a magic
+      // sign-in and the user never actually resets their password.
+      if (type === "recovery") {
+        return NextResponse.redirect(new URL("/reset-password", origin));
+      }
       return NextResponse.redirect(new URL(safeNext, origin));
     }
   }
