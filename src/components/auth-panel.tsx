@@ -1,28 +1,134 @@
 "use client";
 
 import Link from "next/link";
-import type { MouseEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { AuthForm } from "@/components/AuthForm";
 import { Wordmark } from "@/components/Wordmark";
 
 type Mode = "in" | "up";
 
+/** Spotlight spring state: target, core (fast layer), ambient (slow layer). */
+type GlowState = {
+  raf: number;
+  tx: number;
+  ty: number;
+  cx: number;
+  cy: number;
+  ax: number;
+  ay: number;
+  live: boolean;
+};
+
 /**
  * The dark editorial panel of the login design — cursor-following spotlight,
  * blueprint grid, product checklist. The left column of the /login page.
+ *
+ * Carries an iPadOS-style pointer via the `ipad-cursor` library, scoped to this
+ * panel: initCursor on enter, disposeCursor on leave, so the OS cursor is only
+ * replaced while the pointer is over the dark column. Elements tagged
+ * `data-cursor="block"` (the logo) make the pointer morph and wrap them, iPad
+ * style.
+ *
+ * The spotlight itself (.auth-glow) is two radial layers driven by a rAF lerp
+ * rather than a CSS transition: a transition restarts its easing on every
+ * mousemove and rubber-bands, while the per-frame lerp glides. The tight core
+ * chases the pointer faster than the wide ambient wash, which gives the light
+ * a slight depth parallax.
  */
 export function AuthAside({ brand = false }: { brand?: boolean }) {
+  const asideRef = useRef<HTMLElement | null>(null);
+  const glow = useRef<GlowState | null>(null);
+  const reduceMotion = useRef(false);
+
+  useEffect(() => {
+    reduceMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return () => {
+      if (glow.current?.raf) cancelAnimationFrame(glow.current.raf);
+    };
+  }, []);
+
+  const step = useCallback(function tick() {
+    const s = glow.current;
+    const el = asideRef.current;
+    if (!s || !el) return;
+    // Core chases fast, ambient wash trails — two ease rates, one target.
+    s.cx += (s.tx - s.cx) * 0.16;
+    s.cy += (s.ty - s.cy) * 0.16;
+    s.ax += (s.tx - s.ax) * 0.07;
+    s.ay += (s.ty - s.ay) * 0.07;
+    el.style.setProperty("--gx", `${s.cx}px`);
+    el.style.setProperty("--gy", `${s.cy}px`);
+    el.style.setProperty("--ax", `${s.ax}px`);
+    el.style.setProperty("--ay", `${s.ay}px`);
+    const settled =
+      Math.abs(s.tx - s.ax) < 0.3 &&
+      Math.abs(s.ty - s.ay) < 0.3 &&
+      Math.abs(s.tx - s.cx) < 0.3 &&
+      Math.abs(s.ty - s.cy) < 0.3;
+    s.raf = s.live || !settled ? requestAnimationFrame(tick) : 0;
+  }, []);
+
   const onMove = (e: MouseEvent<HTMLElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
-    e.currentTarget.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+    if (reduceMotion.current) return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    if (!glow.current) {
+      // First contact: snap every layer onto the pointer so the light fades
+      // in where the cursor is instead of flying across the panel.
+      glow.current = { raf: 0, tx: x, ty: y, cx: x, cy: y, ax: x, ay: y, live: true };
+    }
+    const s = glow.current;
+    s.tx = x;
+    s.ty = y;
+    s.live = true;
+    el.dataset.lit = "true";
+    if (!s.raf) s.raf = requestAnimationFrame(step);
   };
 
+  const onEnter = useCallback(async () => {
+    const { initCursor } = await import("ipad-cursor");
+    initCursor({
+      // Roomier box when the pointer melds into a control (e.g. the logo).
+      blockPadding: 14,
+      enableAutoTextCursor: false,
+      normalStyle: {
+        width: "26px",
+        height: "20px",
+        radius: "999px",
+        background: "rgba(89, 199, 193, 0.14)",
+        border: "1px solid rgba(89, 199, 193, 0.5)",
+        durationPosition: "0.12s",
+      },
+      blockStyle: {
+        radius: "auto",
+        background: "rgba(89, 199, 193, 0.12)",
+        border: "1px solid rgba(89, 199, 193, 0.32)",
+      },
+    });
+  }, []);
+
+  const onLeave = useCallback(async () => {
+    const s = glow.current;
+    if (s) s.live = false; // let the lerp settle, CSS fades the light out
+    asideRef.current?.removeAttribute("data-lit");
+    const { disposeCursor } = await import("ipad-cursor");
+    disposeCursor();
+  }, []);
+
   return (
-    <aside className="auth-aside" onMouseMove={onMove}>
+    <aside
+      ref={asideRef}
+      className="auth-aside"
+      onMouseMove={onMove}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <div className="auth-glow" aria-hidden />
       {brand && (
         <div className="auth-aside-top">
-          <Link href="/welcome" className="auth-brand">
+          <Link href="/welcome" className="auth-brand" data-cursor="block">
             <Wordmark />
           </Link>
         </div>

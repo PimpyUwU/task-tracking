@@ -533,19 +533,60 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 @media (min-width: 820px) {
   .auth-aside { display: flex; }
 }
-.auth-aside::before {
-  content: "";
+/* Cursor spotlight — two radial layers on one light source. The JS rAF lerp in
+   auth-panel.tsx writes --ax/--ay (wide ambient wash, slow chase) and --gx/--gy
+   (tight warm core, fast chase); the rate gap gives the light depth parallax.
+   Hidden at rest, revealed via data-lit while the pointer is over the panel.
+   Idle motion lives in the grid drift below. */
+.auth-aside .auth-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    460px circle at var(--mx, 28%) var(--my, 22%),
-    rgba(89, 199, 193, 0.18),
-    transparent 62%
-  );
   pointer-events: none;
-  transition: background 120ms linear;
+  opacity: 0;
+  transition: opacity 560ms ease;
 }
-/* Faint blueprint grid under the spotlight. */
+.auth-aside[data-lit="true"] .auth-glow {
+  opacity: 1;
+}
+.auth-glow::before,
+.auth-glow::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+/* Wide ambient wash. */
+.auth-glow::before {
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+  background: radial-gradient(
+    closest-side,
+    rgba(89, 199, 193, 0.11),
+    rgba(89, 199, 193, 0.04) 46%,
+    transparent 74%
+  );
+  transform: translate3d(var(--ax, 40%), var(--ay, 32%), 0);
+}
+/* Tight core — the "bulb" of the light, brightened slightly toward white. */
+.auth-glow::after {
+  width: 240px;
+  height: 240px;
+  margin: -120px 0 0 -120px;
+  background: radial-gradient(
+    closest-side,
+    rgba(151, 227, 222, 0.14),
+    rgba(89, 199, 193, 0.06) 55%,
+    transparent 100%
+  );
+  transform: translate3d(var(--gx, 40%), var(--gy, 32%), 0);
+}
+/* Faint blueprint grid — the idle ambience. Drifts one cell (34px) diagonally
+   on an endless linear loop; because the pattern repeats every 34px the loop is
+   perfectly seamless, so it reads as slow structural motion, not a moving shape.
+   The mask stays put, so lines glide through a fixed vignette. */
 .auth-aside::after {
   content: "";
   position: absolute;
@@ -556,12 +597,18 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
   background-size: 34px 34px;
   mask-image: radial-gradient(90% 70% at 30% 20%, #000, transparent 80%);
   pointer-events: none;
+  animation: auth-grid-drift 34s linear infinite;
+}
+@keyframes auth-grid-drift {
+  from { background-position: 0 0; }
+  to { background-position: 34px 34px; }
 }
 .auth-aside > * { position: relative; z-index: 1; }
 .auth-aside-kicker { color: var(--d-teal); }
 .auth-aside-em { color: var(--d-teal); font-style: italic; }
 .auth-aside-body { color: var(--on-dark-mut); }
-.auth-brand { display: inline-flex; }
+/* Logo — the ipad-cursor pointer morphs to wrap it (data-cursor="block"). */
+.auth-brand { display: inline-flex; border-radius: 10px; }
 
 .auth-aside-list {
   display: flex;
@@ -769,6 +816,53 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
   border-color: var(--danger-line);
 }
 
+/* ---- "Check your inbox" confirmation panel ---- */
+.auth-sent-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 1.15rem;
+  border-radius: 15px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  animation: auth-badge-pop 480ms var(--auth-ease) both;
+}
+@keyframes auth-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+/* One-shot radar ring: pulses twice to say "it's on its way", then rests. */
+.auth-sent-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid var(--accent-line);
+  opacity: 0;
+  animation: auth-sent-ping 1.6s cubic-bezier(0.16, 1, 0.3, 1) 320ms 2;
+}
+@keyframes auth-sent-ping {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+/* The echoed address — the one thing the eye must find on this panel. */
+.auth-sent-email {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 /* ---- Submit with a nudging arrow ---- */
 .auth-submit { width: 100%; padding-top: 0.8rem; padding-bottom: 0.8rem; }
 .auth-submit .arr { transition: transform 240ms var(--auth-ease); }
@@ -801,6 +895,9 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .auth-shell .auth-aside-mid,
   .auth-shell .auth-aside-list,
   .auth-shell .auth-formbox { animation: none; }
-  .auth-aside::before { display: none; }
+  .auth-aside .auth-glow { display: none; }
+  .auth-aside::after { animation: none; }
   .auth-close:hover { transform: none; }
+  .auth-sent-badge { animation: none; }
+  .auth-sent-ring { animation: none; }
 }
