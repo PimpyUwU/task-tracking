@@ -533,37 +533,55 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 @media (min-width: 820px) {
   .auth-aside { display: flex; }
 }
-/* Ambient spotlight — a soft round blob that trails the pointer. Position is a
-   GPU-composited transform eased over ~260ms, so it follows as smoothly as the
-   ipad-cursor library's own motion (no janky background-position interpolation).
-   Hidden at rest; it fades in on enter and out on leave. Idle motion lives in
-   the grid drift below. */
-.auth-aside::before {
+/* Cursor spotlight — two radial layers on one light source. The JS rAF lerp in
+   auth-panel.tsx writes --ax/--ay (wide ambient wash, slow chase) and --gx/--gy
+   (tight warm core, fast chase); the rate gap gives the light depth parallax.
+   Hidden at rest, revealed via data-lit while the pointer is over the panel.
+   Idle motion lives in the grid drift below. */
+.auth-aside .auth-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 560ms ease;
+}
+.auth-aside[data-lit="true"] .auth-glow {
+  opacity: 1;
+}
+.auth-glow::before,
+.auth-glow::after {
   content: "";
   position: absolute;
   left: 0;
   top: 0;
-  width: 680px;
-  height: 680px;
-  margin: -340px 0 0 -340px;
   border-radius: 50%;
+  will-change: transform;
+}
+/* Wide ambient wash. */
+.auth-glow::before {
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
   background: radial-gradient(
     closest-side,
-    rgba(89, 199, 193, 0.13),
-    rgba(89, 199, 193, 0.05) 45%,
+    rgba(89, 199, 193, 0.11),
+    rgba(89, 199, 193, 0.04) 46%,
+    transparent 74%
+  );
+  transform: translate3d(var(--ax, 40%), var(--ay, 32%), 0);
+}
+/* Tight core — the "bulb" of the light, brightened slightly toward white. */
+.auth-glow::after {
+  width: 240px;
+  height: 240px;
+  margin: -120px 0 0 -120px;
+  background: radial-gradient(
+    closest-side,
+    rgba(151, 227, 222, 0.14),
+    rgba(89, 199, 193, 0.06) 55%,
     transparent 100%
   );
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(var(--lx, 40%), var(--ly, 32%));
-  transition:
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 520ms ease;
-  will-change: transform, opacity;
-}
-/* Smoothly reveal the glow while the pointer is over the panel. */
-.auth-aside:hover::before {
-  opacity: 0.9;
+  transform: translate3d(var(--gx, 40%), var(--gy, 32%), 0);
 }
 /* Faint blueprint grid — the idle ambience. Drifts one cell (34px) diagonally
    on an endless linear loop; because the pattern repeats every 34px the loop is
@@ -798,6 +816,53 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
   border-color: var(--danger-line);
 }
 
+/* ---- "Check your inbox" confirmation panel ---- */
+.auth-sent-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 1.15rem;
+  border-radius: 15px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  animation: auth-badge-pop 480ms var(--auth-ease) both;
+}
+@keyframes auth-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+/* One-shot radar ring: pulses twice to say "it's on its way", then rests. */
+.auth-sent-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid var(--accent-line);
+  opacity: 0;
+  animation: auth-sent-ping 1.6s cubic-bezier(0.16, 1, 0.3, 1) 320ms 2;
+}
+@keyframes auth-sent-ping {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+/* The echoed address — the one thing the eye must find on this panel. */
+.auth-sent-email {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 /* ---- Submit with a nudging arrow ---- */
 .auth-submit { width: 100%; padding-top: 0.8rem; padding-bottom: 0.8rem; }
 .auth-submit .arr { transition: transform 240ms var(--auth-ease); }
@@ -830,7 +895,9 @@ html::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .auth-shell .auth-aside-mid,
   .auth-shell .auth-aside-list,
   .auth-shell .auth-formbox { animation: none; }
-  .auth-aside::before { display: none; }
+  .auth-aside .auth-glow { display: none; }
   .auth-aside::after { animation: none; }
   .auth-close:hover { transform: none; }
+  .auth-sent-badge { animation: none; }
+  .auth-sent-ring { animation: none; }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { updatePassword, type AuthState } from "@/app/auth/actions";
 import { PASSWORD_MIN_LENGTH, evaluatePassword } from "@/lib/passwordPolicy";
@@ -55,6 +56,7 @@ export function ResetPasswordForm() {
               name="password"
               type="password"
               autoComplete="new-password"
+              autoFocus
               required
               minLength={PASSWORD_MIN_LENGTH}
               value={password}
@@ -95,6 +97,13 @@ export function ResetPasswordForm() {
           {!pending && <Arrow />}
         </button>
       </form>
+
+      <p className="text-[12.5px] text-ink-3 leading-relaxed mt-6">
+        Link expired or something off?{" "}
+        <Link className="auth-swaplink" href="/login">
+          Request a new one from sign-in
+        </Link>
+      </p>
     </div>
   );
 }

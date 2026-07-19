@@ -8,7 +8,12 @@ import { track } from "@/lib/analytics";
 import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/authProviders";
 import { validatePassword } from "@/lib/passwordPolicy";
 
-export type AuthState = { error?: string; message?: string };
+export type AuthState = {
+  error?: string;
+  message?: string;
+  /** Set when an email was (nominally) dispatched — drives the "check your inbox" panel. */
+  sent?: "reset" | "confirm";
+};
 
 export async function signIn(
   _prev: AuthState,
@@ -53,7 +58,7 @@ export async function signUp(
 
   // When email confirmation is enabled, no session is returned yet.
   if (!data.session) {
-    return { message: "Account created. Check your email to confirm, then sign in." };
+    return { sent: "confirm" };
   }
 
   // Funnel: signup (only recordable once a session exists so RLS insert passes).
@@ -128,12 +133,43 @@ export async function resetPassword(
     redirectTo: `${origin}/reset-password`,
   });
 
-  // Surface only true configuration failures; keep account existence private.
+  // Surface rate limits and true configuration failures; keep account
+  // existence private for everything else.
+  if (error && error.status === 429) {
+    return { error: "Too many requests — give it a minute, then try again." };
+  }
   if (error && error.status && error.status >= 500) {
     return { error: error.message };
   }
 
-  return { message: "If that email has an account, a reset link is on its way." };
+  return { sent: "reset" };
+}
+
+/**
+ * Re-send the sign-up confirmation email. Powers the "Resend" button on the
+ * check-your-inbox panel after account creation. Same privacy posture as
+ * resetPassword: only rate limits and server failures surface as errors.
+ */
+export async function resendConfirmation(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) {
+    return { error: "Something went wrong — go back and sign up again." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+
+  if (error && error.status === 429) {
+    return { error: "Too many requests — give it a minute, then try again." };
+  }
+  if (error && error.status && error.status >= 500) {
+    return { error: error.message };
+  }
+
+  return { sent: "confirm" };
 }
 
 /**
