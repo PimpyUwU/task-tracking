@@ -16,18 +16,17 @@ export type TaskNode = {
 
 const INDENT = 1.75; // rem per level
 
-// Subtask creation is V2 (plan §3.4 D1): machinery kept, entry point hidden.
-// Existing subtasks still render below their parents.
-const SUBTASK_CREATE_ENABLED: boolean = false;
-
 function Row({
   node,
   depth,
   projectId,
+  canAddSubtasks,
 }: {
   node: TaskNode;
   depth: number;
   projectId: string;
+  // Pro-only affordance (plan §3.4 D1). Existing subtasks still render for all.
+  canAddSubtasks: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +119,7 @@ function Row({
             running={node.running}
             loggedSeconds={node.loggedSeconds}
           />
-          {SUBTASK_CREATE_ENABLED && (
+          {canAddSubtasks && (
             <button
               onClick={() => setAdding((v) => !v)}
               className="btn btn-ghost btn-sm"
@@ -139,7 +138,7 @@ function Row({
         </div>
       </div>
 
-      {SUBTASK_CREATE_ENABLED && adding && (
+      {canAddSubtasks && adding && (
         <div
           className="border-b border-line py-2 pr-4"
           style={{ paddingLeft: `${1 + (depth + 1) * INDENT}rem` }}
@@ -187,6 +186,7 @@ function Row({
           node={child}
           depth={depth + 1}
           projectId={projectId}
+          canAddSubtasks={canAddSubtasks}
         />
       ))}
     </>
@@ -196,15 +196,24 @@ function Row({
 export function TaskTree({
   projectId,
   nodes,
+  canAddSubtasks = false,
 }: {
   projectId: string;
   nodes: TaskNode[];
+  /** Pro plans get the "+ Subtask" affordance; free plans never see it. */
+  canAddSubtasks?: boolean;
 }) {
   if (nodes.length === 0) return null;
   return (
     <div className="border-t border-x border-line">
       {nodes.map((n) => (
-        <Row key={n.id} node={n} depth={0} projectId={projectId} />
+        <Row
+          key={n.id}
+          node={n}
+          depth={0}
+          projectId={projectId}
+          canAddSubtasks={canAddSubtasks}
+        />
       ))}
     </div>
   );

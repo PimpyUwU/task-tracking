@@ -3,12 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { InvoiceGenerateButton } from "@/components/InvoiceGenerateButton";
 import { MarkSentButton } from "@/components/MarkSentButton";
 import { UpgradeButton } from "@/components/UpgradeButton";
+import { TemplateUploadForm } from "@/components/TemplateUploadForm";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import {
   buildInvoiceDraft,
   formatMoney,
   listUnbilledClients,
 } from "@/lib/invoice";
 import { getPlan } from "@/lib/plan";
+import { setDefaultTemplate, deleteTemplate } from "@/app/actions/invoiceTemplates";
 
 const INVOICE_BUCKET = "invoices";
 
@@ -164,6 +167,38 @@ export default async function InvoicesPage({
     const summary = unbilled.find((c) => c.id === clientId);
     const user = auth.user;
 
+    // Pro-only: when a user keeps more than one custom template, let them pick
+    // which one styles this invoice. With 0 or 1 template the default resolves
+    // automatically (no decision). Template choice never changes the amounts.
+    const templateParam = first(sp.template);
+    let templates: { id: string; name: string; is_default: boolean }[] = [];
+    if (plan.canUseAdvanced) {
+      const { data } = await supabase
+        .from("invoice_templates")
+        .select("id, name, is_default")
+        .order("created_at", { ascending: true });
+      templates = data ?? [];
+    }
+    // Only an explicit, valid choice is forwarded to generate; otherwise the
+    // action resolves the default itself, keeping the automatic path automatic.
+    const selectedTemplateId =
+      plan.canUseAdvanced && templateParam && templates.some((t) => t.id === templateParam)
+        ? templateParam
+        : null;
+    // What generation would actually use, for the selector's active highlight.
+    const activeTemplateId =
+      selectedTemplateId ?? templates.find((t) => t.is_default)?.id ?? null;
+
+    // Keep client, project and template selections intact when navigating.
+    const previewHref = (next: { project?: string | null; template?: string | null }) => {
+      const p = new URLSearchParams({ client: clientId });
+      const proj = next.project !== undefined ? next.project : projectId;
+      const tmpl = next.template !== undefined ? next.template : selectedTemplateId;
+      if (proj) p.set("project", proj);
+      if (tmpl) p.set("template", tmpl);
+      return `/invoices?${p.toString()}`;
+    };
+
     return (
       <Shell>
         <section className="flex flex-col gap-4">
@@ -177,7 +212,7 @@ export default async function InvoicesPage({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="label">Narrow to</span>
               <Link
-                href={`/invoices?client=${clientId}`}
+                href={previewHref({ project: null })}
                 className={!projectId ? "text-ink font-medium" : "text-ink-3 hover:text-ink transition-colors"}
               >
                 All projects
@@ -185,10 +220,26 @@ export default async function InvoicesPage({
               {summary.projects.map((p) => (
                 <Link
                   key={p.id}
-                  href={`/invoices?client=${clientId}&project=${p.id}`}
+                  href={previewHref({ project: p.id })}
                   className={projectId === p.id ? "text-ink font-medium" : "text-ink-3 hover:text-ink transition-colors"}
                 >
                   {p.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Template — Pro-only, only when there's a real choice (>1). Secondary. */}
+          {plan.canUseAdvanced && templates.length > 1 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className="label">Template</span>
+              {templates.map((t) => (
+                <Link
+                  key={t.id}
+                  href={previewHref({ template: t.id })}
+                  className={activeTemplateId === t.id ? "text-ink font-medium" : "text-ink-3 hover:text-ink transition-colors"}
+                >
+                  {t.name}
                 </Link>
               ))}
             </div>
@@ -267,7 +318,11 @@ export default async function InvoicesPage({
           {/* Generate — or the upgrade moment. The action re-checks the plan
               server-side either way. */}
           {plan.canInvoice ? (
-            <InvoiceGenerateButton clientId={draft.client.id} projectId={projectId} />
+            <InvoiceGenerateButton
+              clientId={draft.client.id}
+              projectId={projectId}
+              templateId={selectedTemplateId}
+            />
           ) : (
             <div
               className="panel p-5 flex flex-wrap items-center justify-between gap-4"
@@ -290,14 +345,25 @@ export default async function InvoicesPage({
   }
 
   // Step 1 — pick: only clients with unbilled billable time, largest first.
-  const [unbilled, { data: invoices }] = await Promise.all([
+  const [unbilled, plan, { data: invoices }] = await Promise.all([
     listUnbilledClients(supabase),
+    getPlan(supabase),
     supabase
       .from("invoices")
       .select("id, invoice_number, status, currency, total, issued_date, pdf_path, docx_path, clients(name)")
       .order("created_at", { ascending: false }),
   ]);
   const invoiceList = (invoices ?? []) as unknown as InvoiceRow[];
+
+  // Custom templates are a Pro capability; only load them when unlocked.
+  let templates: { id: string; name: string; is_default: boolean }[] = [];
+  if (plan.canUseAdvanced) {
+    const { data } = await supabase
+      .from("invoice_templates")
+      .select("id, name, is_default")
+      .order("created_at", { ascending: true });
+    templates = data ?? [];
+  }
 
   return (
     <Shell>
@@ -370,6 +436,75 @@ export default async function InvoicesPage({
             </table>
           </div>
         </section>
+      )}
+
+      {/* Advanced — invoice templates. Pro users manage them here (the default is
+          used silently on generate); free users get one quiet teaser, no panel. */}
+      {plan.canUseAdvanced ? (
+        <details className="panel group">
+          <summary className="flex items-center justify-between gap-3 p-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <div className="flex flex-wrap items-baseline gap-2 min-w-0">
+              <h2 className="panel-title">Advanced — invoice templates</h2>
+              <span className="num text-xs text-ink-3">
+                {templates.length === 0
+                  ? "built-in default"
+                  : `${templates.length} template${templates.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+            <span className="text-ink-3 text-sm transition-transform group-open:rotate-180" aria-hidden>▾</span>
+          </summary>
+          <div className="p-4 pt-0 flex flex-col gap-4">
+            <p className="text-sm text-ink-2">
+              Invoices use a built-in layout by default. Upload a .docx to invoice
+              with your own — set one as the default, or pick per invoice on the
+              preview step.
+            </p>
+            {templates.length > 0 && (
+              <div className="panel overflow-hidden">
+                {templates.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3 rule-b last:border-b-0"
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{t.name}</span>
+                      {t.is_default && <span className="badge badge-bill">Default</span>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!t.is_default && (
+                        <form
+                          action={async () => {
+                            "use server";
+                            await setDefaultTemplate(t.id);
+                          }}
+                        >
+                          <button type="submit" className="btn btn-ghost btn-sm">
+                            Set default
+                          </button>
+                        </form>
+                      )}
+                      <ConfirmAction
+                        action={deleteTemplate.bind(null, t.id)}
+                        label="Delete"
+                        confirmLabel="Delete template?"
+                        className="btn btn-ghost btn-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div><TemplateUploadForm /></div>
+          </div>
+        </details>
+      ) : (
+        <Link
+          href="/plan"
+          className="inline-flex items-center gap-2 self-start text-xs text-ink-3 hover:text-ink transition-colors"
+        >
+          Custom invoice templates
+          <span className="badge badge-norate">Pro</span>
+        </Link>
       )}
     </Shell>
   );

@@ -11,9 +11,12 @@ import { generateInvoice } from "@/app/actions/invoices";
 export function InvoiceGenerateButton({
   clientId,
   projectId,
+  templateId,
 }: {
   clientId: string;
   projectId?: string | null;
+  /** Pro-only: chosen custom template. Omitted ⇒ the default resolves server-side. */
+  templateId?: string | null;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -35,6 +38,7 @@ export function InvoiceGenerateButton({
     <form action={onSubmit} className="flex flex-wrap items-center gap-3">
       <input type="hidden" name="client_id" value={clientId} />
       {projectId && <input type="hidden" name="project_id" value={projectId} />}
+      {templateId && <input type="hidden" name="template_id" value={templateId} />}
       <button type="submit" className="btn btn-accent" disabled={pending}>
         {pending ? "Generating…" : "Generate invoice"}
       </button>

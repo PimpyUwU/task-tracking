@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { detectPlaceholders, DOCX_MIME } from "@/lib/docx";
+import { getPlan } from "@/lib/plan";
+
+const PRO_ONLY =
+  "Custom invoice templates are a Pro feature. Upgrade on the Plan page.";
 
 const BUCKET = "invoice-templates";
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -19,6 +23,9 @@ async function requireUser() {
 
 export async function uploadTemplate(formData: FormData) {
   const { supabase, user } = await requireUser();
+
+  const plan = await getPlan(supabase);
+  if (!plan.canUseAdvanced) return { error: PRO_ONLY };
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -69,6 +76,10 @@ export async function uploadTemplate(formData: FormData) {
 
 export async function setDefaultTemplate(templateId: string) {
   const { supabase, user } = await requireUser();
+
+  const plan = await getPlan(supabase);
+  if (!plan.canUseAdvanced) return { error: PRO_ONLY };
+
   // Clear any existing default, then set this one (RLS keeps it user-scoped).
   const { error: clearErr } = await supabase
     .from("invoice_templates")

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPlan } from "@/lib/plan";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -41,6 +42,12 @@ export async function createSubtask(
   parentId: string,
   formData: FormData,
 ) {
+  // Subtasks are Pro-only. Enforce here — hiding the UI is not enforcement.
+  const { supabase } = await requireUser();
+  const plan = await getPlan(supabase);
+  if (!plan.canUseAdvanced) {
+    return { error: "Subtasks are a Pro feature. Upgrade on the Plan page." };
+  }
   return createTask(projectId, formData, parentId);
 }
 

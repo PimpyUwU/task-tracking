@@ -15,6 +15,8 @@ export type Plan = {
   limits: { clients: number; projects: number };
   canInvoice: boolean;
   canExport: boolean;
+  /** Pro-only "Advanced" surfaces: subtasks and custom invoice templates. */
+  canUseAdvanced: boolean;
 };
 
 const PAID_PLAN: Plan = {
@@ -23,6 +25,7 @@ const PAID_PLAN: Plan = {
   limits: { clients: Infinity, projects: Infinity },
   canInvoice: true,
   canExport: true,
+  canUseAdvanced: true,
 };
 
 /**
@@ -46,6 +49,7 @@ export async function getPlan(supabase: Supabase): Promise<Plan> {
     limits: { clients: FREE_LIMITS.clients, projects: FREE_LIMITS.projects },
     canInvoice: false,
     canExport: false,
+    canUseAdvanced: false,
   };
 }
 

@@ -112,6 +112,8 @@ export default async function PlanPage() {
           limit={usage.projects.limit}
         />
         <PlanFeature label="Invoicing" unlocked={usage.canInvoice} />
+        <PlanFeature label="Subtasks" unlocked={paid} />
+        <PlanFeature label="Custom invoice templates" unlocked={paid} />
       </div>
 
       {/* What Pro unlocks */}

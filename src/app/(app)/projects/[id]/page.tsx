@@ -11,6 +11,7 @@ import { InlineClientForm } from "@/components/InlineClientForm";
 import { ProjectOverflowMenu } from "@/components/ProjectOverflowMenu";
 import { formatDuration, formatHours } from "@/lib/time";
 import { formatMoney } from "@/lib/invoice";
+import { getPlan } from "@/lib/plan";
 import { deleteEntry } from "@/app/actions/time";
 import type { Task, TaskRollup, TimeEntry } from "@/lib/database.types";
 
@@ -41,7 +42,7 @@ export default async function ProjectDetailPage({
     .maybeSingle();
   if (!project) notFound();
 
-  const [{ data: clients }, { data: linkedClient }, { data: projRollup }] =
+  const [{ data: clients }, { data: linkedClient }, { data: projRollup }, plan] =
     await Promise.all([
       supabase
         .from("clients")
@@ -60,6 +61,7 @@ export default async function ProjectDetailPage({
         .select("billable_seconds, total_seconds")
         .eq("project_id", id)
         .maybeSingle(),
+      getPlan(supabase),
     ]);
 
   const clientOptions = clients ?? [];
@@ -220,7 +222,7 @@ export default async function ProjectDetailPage({
           </div>
         ) : (
           <div className="panel overflow-hidden">
-            <TaskTree projectId={id} nodes={taskTree} />
+            <TaskTree projectId={id} nodes={taskTree} canAddSubtasks={plan.canUseAdvanced} />
           </div>
         )}
         <div><TaskForm projectId={id} /></div>

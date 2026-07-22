@@ -13,7 +13,7 @@ import { renderInvoiceDocx, DOCX_MIME } from "@/lib/docx";
 import { renderInvoicePdf } from "@/lib/invoicePdf";
 import { buildDefaultTemplateDocx } from "@/lib/defaultTemplate";
 import { track } from "@/lib/analytics";
-import { assertCanInvoice } from "@/lib/plan";
+import { assertCanInvoice, getPlan } from "@/lib/plan";
 
 const INVOICE_BUCKET = "invoices";
 const TEMPLATE_BUCKET = "invoice-templates";
@@ -102,7 +102,15 @@ export async function generateInvoice(formData: FormData) {
   if (!clientId) return { error: "Select a client." };
 
   const projectId = String(formData.get("project_id") ?? "").trim() || null;
-  const templateIdInput = String(formData.get("template_id") ?? "").trim() || null;
+
+  // Custom invoice templates are a Pro-only capability. Ignore a chosen template
+  // for anyone without it — the built-in default still renders the document, so
+  // the request isn't discarded. Template choice never affects amounts.
+  let templateIdInput = String(formData.get("template_id") ?? "").trim() || null;
+  if (templateIdInput) {
+    const plan = await getPlan(supabase);
+    if (!plan.canUseAdvanced) templateIdInput = null;
+  }
   const periodStart = String(formData.get("period_start") ?? "").trim() || null;
   const periodEnd = String(formData.get("period_end") ?? "").trim() || null;
   const dueDate = String(formData.get("due_date") ?? "").trim() || null;
