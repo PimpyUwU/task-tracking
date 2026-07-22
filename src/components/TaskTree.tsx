@@ -16,6 +16,10 @@ export type TaskNode = {
 
 const INDENT = 1.75; // rem per level
 
+// Subtask creation is V2 (plan §3.4 D1): machinery kept, entry point hidden.
+// Existing subtasks still render below their parents.
+const SUBTASK_CREATE_ENABLED: boolean = false;
+
 function Row({
   node,
   depth,
@@ -116,14 +120,16 @@ function Row({
             running={node.running}
             loggedSeconds={node.loggedSeconds}
           />
-          <button
-            onClick={() => setAdding((v) => !v)}
-            className="btn btn-ghost btn-sm"
-            aria-label="Add subtask"
-            title="Add a subtask"
-          >
-            + Subtask
-          </button>
+          {SUBTASK_CREATE_ENABLED && (
+            <button
+              onClick={() => setAdding((v) => !v)}
+              className="btn btn-ghost btn-sm"
+              aria-label="Add subtask"
+              title="Add a subtask"
+            >
+              + Subtask
+            </button>
+          )}
           <ConfirmAction
             action={deleteTask.bind(null, node.id, projectId)}
             label="Delete"
@@ -133,7 +139,7 @@ function Row({
         </div>
       </div>
 
-      {adding && (
+      {SUBTASK_CREATE_ENABLED && adding && (
         <div
           className="border-b border-line py-2 pr-4"
           style={{ paddingLeft: `${1 + (depth + 1) * INDENT}rem` }}

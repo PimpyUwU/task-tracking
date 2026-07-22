@@ -43,6 +43,9 @@ export type InvoiceDraft = {
   entryIds: string[]; // entries to stamp on generate
   periodStart: string | null;
   periodEnd: string | null;
+  /** Actual span of the selected entries (min/max started_at), for display. */
+  coveredFrom: string | null;
+  coveredTo: string | null;
 };
 
 export type DraftParams = {
@@ -145,12 +148,20 @@ export async function buildInvoiceDraft(
   // Aggregate seconds per task; keep the entry ids for stamping on generate.
   const secondsByTask = new Map<string, number>();
   const entryIds: string[] = [];
+  let coveredFrom: string | null = null;
+  let coveredTo: string | null = null;
   for (const e of entries) {
     entryIds.push(e.id);
     secondsByTask.set(
       e.task_id,
       (secondsByTask.get(e.task_id) ?? 0) + (e.duration_seconds ?? 0),
     );
+    if (!coveredFrom || Date.parse(e.started_at) < Date.parse(coveredFrom)) {
+      coveredFrom = e.started_at;
+    }
+    if (!coveredTo || Date.parse(e.started_at) > Date.parse(coveredTo)) {
+      coveredTo = e.started_at;
+    }
   }
 
   const lines: InvoiceLineDraft[] = [];
@@ -211,6 +222,110 @@ export async function buildInvoiceDraft(
       entryIds,
       periodStart: periodStart ?? null,
       periodEnd: periodEnd ?? null,
+      coveredFrom,
+      coveredTo,
     },
   };
+}
+
+export type UnbilledProjectSummary = { id: string; name: string; amount: number };
+
+export type UnbilledClientSummary = {
+  id: string;
+  name: string;
+  currency: string;
+  hours: number;
+  amount: number;
+  /** Only projects with unbilled billable time, highest amount first. */
+  projects: UnbilledProjectSummary[];
+};
+
+/**
+ * Per-client unbilled summary for the invoice picker. Uses the same entry
+ * selection filters and per-task rounding as buildInvoiceDraft, so the amount
+ * shown when picking a client equals the previewed subtotal by construction.
+ */
+export async function listUnbilledClients(
+  supabase: Supabase,
+): Promise<UnbilledClientSummary[]> {
+  const { data: clients } = await supabase
+    .from("clients")
+    .select("id, name, currency, default_rate")
+    .eq("is_archived", false);
+  if (!clients || clients.length === 0) return [];
+
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, rate, client_id")
+    .in("client_id", clients.map((c) => c.id));
+  if (!projects || projects.length === 0) return [];
+
+  const clientById = new Map(clients.map((c) => [c.id, c]));
+  const projectById = new Map(projects.map((p) => [p.id, p]));
+
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("id, project_id")
+    .in("project_id", projects.map((p) => p.id));
+  const projectByTask = new Map((tasks ?? []).map((t) => [t.id, t.project_id]));
+  if (projectByTask.size === 0) return [];
+
+  const { data: entries } = await supabase
+    .from("time_entries")
+    .select("task_id, duration_seconds")
+    .in("task_id", [...projectByTask.keys()])
+    .eq("is_billable", true)
+    .is("invoice_id", null)
+    .not("ended_at", "is", null);
+
+  const secondsByTask = new Map<string, number>();
+  for (const e of entries ?? []) {
+    secondsByTask.set(
+      e.task_id,
+      (secondsByTask.get(e.task_id) ?? 0) + (e.duration_seconds ?? 0),
+    );
+  }
+
+  type Acc = { hours: number; amount: number; byProject: Map<string, number> };
+  const perClient = new Map<string, Acc>();
+  for (const [taskId, seconds] of secondsByTask) {
+    const projectId = projectByTask.get(taskId);
+    const project = projectId ? projectById.get(projectId) : undefined;
+    if (!project?.client_id) continue;
+    const client = clientById.get(project.client_id);
+    if (!client) continue;
+    const hours = round4(seconds / 3600);
+    if (hours <= 0) continue;
+    const rate = project.rate ?? client.default_rate ?? 0;
+    const amount = round2(hours * rate);
+    const acc =
+      perClient.get(client.id) ??
+      { hours: 0, amount: 0, byProject: new Map<string, number>() };
+    acc.hours += hours;
+    acc.amount += amount;
+    acc.byProject.set(project.id, (acc.byProject.get(project.id) ?? 0) + amount);
+    perClient.set(client.id, acc);
+  }
+
+  const result: UnbilledClientSummary[] = [];
+  for (const [clientId, acc] of perClient) {
+    const client = clientById.get(clientId);
+    if (!client) continue;
+    result.push({
+      id: clientId,
+      name: client.name,
+      currency: client.currency,
+      hours: round2(acc.hours),
+      amount: round2(acc.amount),
+      projects: [...acc.byProject.entries()]
+        .map(([id, amount]) => ({
+          id,
+          name: projectById.get(id)?.name ?? "",
+          amount: round2(amount),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    });
+  }
+  result.sort((a, b) => b.amount - a.amount);
+  return result;
 }

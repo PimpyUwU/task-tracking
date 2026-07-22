@@ -154,8 +154,7 @@ export default async function InvoiceDetailPage({
         {/* Rate snapshot — trust cue */}
         <p className="text-xs text-ink-3 flex items-center gap-1.5">
           <span aria-hidden>🔒</span>
-          Rates locked at generation on {fmtDate(invoice.issued_date)} — editing a
-          client’s rate later won’t rewrite this invoice.
+          Rates locked at generation — later rate changes never affect this invoice.
         </p>
       </div>
 

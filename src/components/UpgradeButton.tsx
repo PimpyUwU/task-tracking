@@ -23,9 +23,11 @@ declare global {
 export function UpgradeButton({
   email,
   userId,
+  label = "Upgrade — $9/mo",
 }: {
   email: string | null;
   userId: string;
+  label?: string;
 }) {
   const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
   const priceId = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID;
@@ -73,7 +75,7 @@ export function UpgradeButton({
         onClick={openCheckout}
         disabled={!ready}
       >
-        {ready ? "Upgrade — $9/mo" : "Loading checkout…"}
+        {ready ? label : "Loading checkout…"}
       </button>
     </>
   );
