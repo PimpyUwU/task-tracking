@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { track, trackOnce } from "@/lib/analytics";
 import { assertWithinLimit } from "@/lib/plan";
+import { parseTimeInput, resolveEntryTimes } from "@/lib/parseTimeInput";
 
 /** Where a timer start came from — funnel property on `timer_started` (§11). */
 export type TimerSource = "start_bar" | "task_row" | "first_run";
@@ -213,6 +214,53 @@ export async function addManualEntry(projectId: string, formData: FormData) {
   if (ended < started) {
     return { error: "End time must be after start time." };
   }
+
+  const isBillable = await taskBillableDefault(supabase, taskId);
+  const { error } = await supabase.from("time_entries").insert({
+    user_id: user.id,
+    task_id: taskId,
+    started_at: started.toISOString(),
+    ended_at: ended.toISOString(),
+    notes,
+    is_billable: isBillable,
+  });
+
+  if (error) return { error: error.message };
+
+  // Funnel: activation = the user's first completed billable entry.
+  if (isBillable) await trackOnce(supabase, user.id, "activation");
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/**
+ * "Add time" smart field (plan §6 Flow 3): one text input parsed to a duration
+ * or a clock range, plus the chosen day. The client parses for instant feedback;
+ * we re-parse and re-validate here so the entry never trusts client-computed
+ * timestamps. `today` is the caller's local date, used only to pick the anchor.
+ */
+export async function addTimeEntry(projectId: string, formData: FormData) {
+  const { supabase, user } = await requireUser();
+
+  const taskId = String(formData.get("task_id") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const today = String(formData.get("today") ?? "");
+  const input = String(formData.get("input") ?? "");
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (!taskId) return { error: "Pick a task first." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick a valid date." };
+
+  const parsed = parseTimeInput(input);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const { started, ended } = resolveEntryTimes(parsed, date, date === today);
+  if (Number.isNaN(started.getTime()) || Number.isNaN(ended.getTime())) {
+    return { error: "Invalid date or time." };
+  }
+  if (ended <= started) return { error: "The end must be after the start." };
 
   const isBillable = await taskBillableDefault(supabase, taskId);
   const { error } = await supabase.from("time_entries").insert({

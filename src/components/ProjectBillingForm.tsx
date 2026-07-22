@@ -78,7 +78,7 @@ export function ProjectBillingForm({
 
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="btn">
-          {pending ? "Saving…" : "Save billing"}
+          {pending ? "Saving…" : "Save"}
         </button>
         {saved && !pending && (
           <span className="text-xs text-ink-3">Saved.</span>

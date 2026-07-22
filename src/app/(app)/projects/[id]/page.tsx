@@ -7,9 +7,10 @@ import { ManualEntryForm } from "@/components/ManualEntryForm";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { BillableToggle } from "@/components/BillableToggle";
 import { ProjectBillingForm } from "@/components/ProjectBillingForm";
+import { InlineClientForm } from "@/components/InlineClientForm";
+import { ProjectOverflowMenu } from "@/components/ProjectOverflowMenu";
 import { formatDuration, formatHours } from "@/lib/time";
 import { formatMoney } from "@/lib/invoice";
-import { setProjectArchived, deleteProject } from "@/app/actions/projects";
 import { deleteEntry } from "@/app/actions/time";
 import type { Task, TaskRollup, TimeEntry } from "@/lib/database.types";
 
@@ -108,6 +109,8 @@ export default async function ProjectDetailPage({
   }
 
   const taskOptions = taskList.map((t) => ({ id: t.id, name: t.name }));
+  // Pre-select the most recently tracked task when adding time by hand.
+  const defaultTaskId = entryList[0]?.task_id;
 
   const childrenOf = new Map<string | null, Task[]>();
   for (const t of taskList) {
@@ -125,16 +128,20 @@ export default async function ProjectDetailPage({
   });
   const taskTree = (childrenOf.get(null) ?? []).map(buildNode);
 
+  const rateLabel =
+    effectiveRate != null ? `${formatMoney(effectiveRate, cur)}/h` : "no rate";
+  const clientRateSummary = `${linkedClient?.name ?? "No client"} · ${rateLabel}`;
+
   return (
     <div className="max-w-5xl px-5 md:px-8 py-7 flex flex-col gap-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-ink-3">
-        <Link href="/" className="hover:text-ink transition-colors">Overview</Link>
+        <Link href="/" className="hover:text-ink transition-colors">Today</Link>
         <span aria-hidden>/</span>
         <span className="text-ink-2 truncate">{project.name}</span>
       </nav>
 
-      {/* Header */}
+      {/* Header — name, client · rate, earnings/tracked, overflow menu */}
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="flex items-start gap-3 min-w-0">
           <span className="mt-1.5 h-3.5 w-3.5 rounded-[3px] shrink-0" style={{ background: project.color }} aria-hidden />
@@ -152,17 +159,20 @@ export default async function ProjectDetailPage({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-7">
-          <div>
-            <div className="num text-2xl leading-none" style={{ color: earnings != null ? "var(--gold)" : "var(--ink-3)" }}>
-              {earnings != null ? formatMoney(earnings, cur) : "—"}
+        <div className="flex items-start gap-6">
+          <div className="flex items-center gap-7">
+            <div>
+              <div className="num text-2xl leading-none" style={{ color: earnings != null ? "var(--gold)" : "var(--ink-3)" }}>
+                {earnings != null ? formatMoney(earnings, cur) : "—"}
+              </div>
+              <div className="label mt-1.5">Billable earnings</div>
             </div>
-            <div className="label mt-1.5">Billable earnings</div>
+            <div>
+              <div className="num text-2xl leading-none text-ink-2">{formatHours(totalSeconds)} h</div>
+              <div className="label mt-1.5">Tracked</div>
+            </div>
           </div>
-          <div>
-            <div className="num text-2xl leading-none text-ink-2">{formatHours(totalSeconds)} h</div>
-            <div className="label mt-1.5">Tracked</div>
-          </div>
+          <ProjectOverflowMenu projectId={id} isArchived={project.is_archived} />
         </div>
       </div>
 
@@ -180,17 +190,22 @@ export default async function ProjectDetailPage({
         </div>
       )}
 
-      {/* No-client guard */}
+      {/* No-client guard — warning carries its fix (plan §4.6) */}
       {noClient && (
-        <div className="panel p-4 flex flex-wrap items-center gap-3" style={{ borderColor: "var(--danger-line)", background: "var(--danger-dim)" }}>
-          <span className="badge badge-warn">⚠ Can’t invoice</span>
-          <p className="text-sm text-ink-2 flex-1 min-w-[200px]">
-            This is a billable project with no client. Set a client below to unlock invoicing.
-          </p>
+        <div className="panel p-4 flex flex-col gap-3" style={{ borderColor: "var(--danger-line)", background: "var(--danger-dim)" }}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="badge badge-warn">⚠ No client</span>
+            <p className="text-sm text-ink-2 flex-1 min-w-[200px]">
+              Can’t invoice yet — this project has no client.
+            </p>
+          </div>
+          <div>
+            <InlineClientForm projectId={id} triggerLabel="Add client" variant="accent" />
+          </div>
         </div>
       )}
 
-      {/* Tasks */}
+      {/* Tasks & time — the default, primary content */}
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline gap-2">
           <h2 className="panel-title">Tasks</h2>
@@ -200,7 +215,7 @@ export default async function ProjectDetailPage({
           <div className="panel py-12 px-6 text-center">
             <p className="font-medium mb-1">No tasks yet</p>
             <p className="text-sm text-ink-2">
-              Add a task below, then press Start to track time. Use “+ Subtask” to break work into steps.
+              Add your first task below, then press Start to track time.
             </p>
           </div>
         ) : (
@@ -211,43 +226,20 @@ export default async function ProjectDetailPage({
         <div><TaskForm projectId={id} /></div>
       </section>
 
-      {/* Billing */}
+      {/* Tracked time (recent) */}
       <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
-            <h2 className="panel-title">Billing</h2>
-            <span className="text-xs text-ink-3">client &amp; hourly rate for invoices</span>
-          </div>
-          {project.client_id ? (
-            <Link href="/invoices" className="btn btn-accent btn-sm">Create invoice →</Link>
-          ) : (
-            <span className="btn btn-sm" style={{ opacity: 0.5, cursor: "not-allowed" }} title="Set a client first">
-              Create invoice
-            </span>
-          )}
-        </div>
-        <ProjectBillingForm
-          projectId={id}
-          clients={clientOptions}
-          currentClientId={project.client_id}
-          currentRate={project.rate}
-        />
-      </section>
-
-      {/* Entries */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <h2 className="panel-title">Recent entries</h2>
+            <h2 className="panel-title">Tracked time</h2>
             <span className="num text-xs text-ink-3">{entryList.length}</span>
           </div>
-          <ManualEntryForm projectId={id} tasks={taskOptions} />
+          <ManualEntryForm projectId={id} tasks={taskOptions} defaultTaskId={defaultTaskId} />
         </div>
 
         {entryList.length === 0 ? (
           <div className="panel py-12 px-6 text-center">
-            <p className="font-medium mb-1">No time logged yet</p>
-            <p className="text-sm text-ink-2">Start a timer on a task above, or log time manually.</p>
+            <p className="font-medium mb-1">No time tracked yet</p>
+            <p className="text-sm text-ink-2">Start a timer on a task above to track your first minutes.</p>
           </div>
         ) : (
           <div className="panel overflow-hidden">
@@ -285,16 +277,33 @@ export default async function ProjectDetailPage({
         )}
       </section>
 
-      {/* Admin footer */}
-      <section className="rule-t pt-6 flex flex-wrap items-center gap-3">
-        <form action={async () => { "use server"; await setProjectArchived(id, !project.is_archived); }}>
-          <button type="submit" className="btn">
-            {project.is_archived ? "Unarchive project" : "Archive project"}
-          </button>
-        </form>
-        <ConfirmAction action={deleteProject.bind(null, id)} label="Delete project" confirmLabel="Delete everything?" className="btn btn-danger" />
-        <p className="text-xs text-ink-3 ml-auto">Deleting a project removes its tasks and time entries.</p>
-      </section>
+      {/* Client & rate — configuration, collapsed by default (auto-open when
+          the project is billable with no client). */}
+      <details open={noClient} className="panel group">
+        <summary className="flex items-center justify-between gap-3 p-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          <div className="flex flex-wrap items-baseline gap-2 min-w-0">
+            <h2 className="panel-title">Client &amp; rate</h2>
+            <span className="num text-xs text-ink-3 truncate">{clientRateSummary}</span>
+          </div>
+          <span className="text-ink-3 text-sm transition-transform group-open:rotate-180" aria-hidden>▾</span>
+        </summary>
+        <div className="p-4 pt-0 flex flex-col gap-4">
+          <ProjectBillingForm
+            projectId={id}
+            clients={clientOptions}
+            currentClientId={project.client_id}
+            currentRate={project.rate}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <InlineClientForm projectId={id} />
+            {project.client_id && (
+              <Link href={`/invoices?client=${project.client_id}`} className="btn btn-accent btn-sm ml-auto">
+                Create invoice →
+              </Link>
+            )}
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

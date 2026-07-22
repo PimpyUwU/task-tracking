@@ -82,6 +82,58 @@ export async function createClient(formData: FormData) {
   return { ok: true, id: data.id };
 }
 
+/**
+ * Just-in-time client creation (plan §6 Flow 5, fixes F6): the three-field inline
+ * mini-form. Same auth guard, free-tier ceiling and rate parsing as createClient,
+ * but only name/email/rate — everything else defaults. When `projectId` is given
+ * (created from a project's no-client warning or its Client & rate section) the
+ * new client is linked to that project in the same round-trip so invoicing
+ * unlocks without a second step.
+ */
+export async function createClientInline(
+  formData: FormData,
+  projectId?: string | null,
+) {
+  const { supabase, user } = await requireUser();
+
+  const limitErr = await assertWithinLimit(supabase, "clients");
+  if (limitErr) return limitErr;
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Client name is required." };
+
+  const rate = parseRate(formData.get("default_rate"));
+  if (rate && typeof rate === "object") return rate; // { error }
+
+  const email = String(formData.get("email") ?? "").trim() || null;
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({
+      user_id: user.id,
+      name,
+      email,
+      default_rate: rate as number | null,
+    })
+    .select("id, name")
+    .single();
+
+  if (error) return { error: error.message };
+
+  if (projectId) {
+    const { error: linkErr } = await supabase
+      .from("projects")
+      .update({ client_id: data.id })
+      .eq("id", projectId);
+    if (linkErr) return { error: linkErr.message };
+    revalidatePath(`/projects/${projectId}`);
+  }
+
+  revalidatePath("/clients");
+  revalidatePath("/");
+  return { ok: true as const, id: data.id, name: data.name };
+}
+
 export async function updateClient(clientId: string, formData: FormData) {
   const { supabase } = await requireUser();
 
