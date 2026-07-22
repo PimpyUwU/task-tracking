@@ -23,6 +23,7 @@ export function SidebarNav({ projects }: { projects: Item[] }) {
   // drop to a separated "Manage" cluster below the projects (plan §5).
   const primary = [
     { href: "/", label: "Today" },
+    { href: "/reports", label: "Reports" },
     { href: "/invoices", label: "Invoices" },
   ];
   const manage = [

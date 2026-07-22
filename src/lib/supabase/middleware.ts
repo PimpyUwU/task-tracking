@@ -6,7 +6,9 @@ import type { Database } from "@/lib/database.types";
 // `/api/paddle` (Paddle webhook) and `/api/auth` (Supabase Send Email hook) are
 // server-to-server endpoints — each authenticates via its own signature, so
 // they must bypass the session-redirect guard.
-const PUBLIC_PATHS = ["/login", "/auth", "/welcome", "/api/paddle", "/api/auth"];
+// `/api/digest` (Vercel Cron) authenticates with the CRON_SECRET bearer, so it
+// too runs server-to-server without a user session.
+const PUBLIC_PATHS = ["/login", "/auth", "/welcome", "/api/paddle", "/api/auth", "/api/digest"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

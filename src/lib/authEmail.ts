@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { escapeHtml, renderEmailShell } from "@/lib/emailShell";
 
 /**
  * Auth transactional email — the Next.js backend replacement for the former
@@ -6,7 +7,13 @@ import crypto from "node:crypto";
  * POSTs here (see src/app/api/auth/send-email/route.ts); we verify the Standard
  * Webhooks signature, render a branded email, and deliver it via Resend's HTTP
  * API. No external automation service is involved.
+ *
+ * The branded shell (logo, palette, scaffold) lives in emailShell.ts and is
+ * shared with the weekly digest; escapeHtml is re-exported for callers that
+ * imported it from here.
  */
+
+export { escapeHtml };
 
 // ── Payload shape (Supabase Send Email hook) ────────────────────────────────
 export type SendEmailHookPayload = {
@@ -126,17 +133,12 @@ const COPY: Record<string, Copy> = {
   },
 };
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
-}
-
 /**
  * Render a branded transactional email. Email-client-safe: table layout, inline
  * styles only, no external assets — the FluxWork mark is drawn with nested
  * table cells (teal rounded square, serif "F", brass underline) so it renders
- * without an image request. Brand palette mirrors globals.css.
+ * without an image request. Brand palette mirrors globals.css. The scaffold
+ * (logo + card frame + footer row) is the shared shell from emailShell.ts.
  */
 export function renderAuthEmail(
   actionType: string,
@@ -146,16 +148,6 @@ export function renderAuthEmail(
   const c = COPY[actionType] ?? COPY.signup;
   const url = escapeHtml(confirmUrl);
 
-  // FluxWork mark: teal rounded square with a serif F over a brass underline.
-  const logo = `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-      <td style="width:40px;height:40px;background:#0e5c63;border-radius:11px;text-align:center;vertical-align:middle;">
-        <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:26px;color:#eef1f1;">F</div>
-        <div style="height:2px;margin:-3px 9px 0;background:#e0b36a;border-radius:2px;line-height:2px;font-size:0;">&nbsp;</div>
-      </td>
-      <td style="padding-left:11px;font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.01em;color:#0f1a1c;">FluxWork</td>
-    </tr></table>`;
-
   const codeBlock = token
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 0;"><tr>
         <td style="background:#eef1f1;border-radius:11px;padding:14px 16px;">
@@ -164,21 +156,7 @@ export function renderAuthEmail(
         </td></tr></table>`
     : "";
 
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
-</head>
-<body style="margin:0;padding:0;background:#eef1f1;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(c.intro)}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef1f1;">
-    <tr><td align="center" style="padding:36px 16px;">
-      <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px;max-width:100%;">
-        <tr><td style="padding:0 4px 22px;">${logo}</td></tr>
-        <tr><td style="background:#ffffff;border:1px solid #dce2e1;border-top:3px solid #b9791f;border-radius:16px;padding:36px 34px;">
-          <div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#0e5c63;font-weight:700;">${escapeHtml(c.kicker)}</div>
+  const card = `<div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#0e5c63;font-weight:700;">${escapeHtml(c.kicker)}</div>
           <h1 style="font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:26px;line-height:1.15;margin:12px 0 10px;color:#0f1a1c;">${escapeHtml(c.heading)}</h1>
           <p style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#566468;margin:0 0 26px;">${escapeHtml(c.intro)}</p>
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -189,17 +167,12 @@ export function renderAuthEmail(
           <div style="height:1px;background:#dce2e1;margin:28px 0 0;line-height:1px;font-size:0;">&nbsp;</div>
           <p style="font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#7e8a8d;margin:20px 0 4px;">Or paste this link into your browser:</p>
           <p style="font-family:'Courier New',monospace;font-size:12px;line-height:1.5;color:#0e5c63;word-break:break-all;margin:0;">${url}</p>
-          ${codeBlock}
-        </td></tr>
-        <tr><td style="padding:22px 6px 0;">
-          <p style="font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#7e8a8d;margin:0;">FluxWork &middot; time tracking &amp; invoicing for freelancers</p>
-          <p style="font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#9aa4a6;margin:6px 0 0;">If you didn't request this email, you can safely ignore it.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+          ${codeBlock}`;
+
+  const footer = `<p style="font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#7e8a8d;margin:0;">FluxWork &middot; time tracking &amp; invoicing for freelancers</p>
+          <p style="font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#9aa4a6;margin:6px 0 0;">If you didn't request this email, you can safely ignore it.</p>`;
+
+  const html = renderEmailShell({ preheader: escapeHtml(c.intro), card, footer });
   return { subject: c.subject, html };
 }
 
