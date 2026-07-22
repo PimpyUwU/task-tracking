@@ -41,19 +41,15 @@ export async function Sidebar() {
   );
 }
 
-/** Compact top bar shown instead of the sidebar on small screens. */
-export async function MobileBar() {
-  const supabase = await createClient();
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("id, name, color")
-    .eq("is_archived", false)
-    .order("created_at", { ascending: false });
-
+/**
+ * Minimal top bar on small screens — wordmark + sign out. Navigation lives in
+ * the bottom tab bar (StartBar), not a scrolling strip.
+ */
+export function MobileBar() {
   return (
     <header className="md:hidden sticky top-0 z-20 border-b border-line bg-paper-2/95 backdrop-blur-sm">
       <div className="px-4 h-14 flex items-center justify-between">
-        <Link href="/" aria-label="FluxWork — Overview">
+        <Link href="/" aria-label="FluxWork — Today">
           <Wordmark />
         </Link>
         <form action={signOut}>
@@ -61,9 +57,6 @@ export async function MobileBar() {
             Sign out
           </button>
         </form>
-      </div>
-      <div className="px-3 pb-2 overflow-x-auto">
-        <SidebarNav projects={projects ?? []} />
       </div>
     </header>
   );

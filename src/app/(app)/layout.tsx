@@ -1,5 +1,10 @@
 import { Sidebar, MobileBar } from "@/components/Sidebar";
-import { RunningTimerBar, type RunningEntry } from "@/components/RunningTimerBar";
+import {
+  StartBar,
+  type PickerData,
+  type PickerTask,
+  type RunningEntry,
+} from "@/components/StartBar";
 import { createClient } from "@/lib/supabase/server";
 
 async function getRunningEntry(): Promise<RunningEntry | null> {
@@ -49,19 +54,83 @@ async function getRunningEntry(): Promise<RunningEntry | null> {
   };
 }
 
+/** Preload the quick-picker: recents, all active tasks, projects. Scale is small. */
+async function getPickerData(): Promise<PickerData> {
+  const supabase = await createClient();
+
+  const [{ data: recentEntries }, { data: tasks }, { data: projects }] =
+    await Promise.all([
+      supabase
+        .from("time_entries")
+        .select("task_id, started_at")
+        .order("started_at", { ascending: false })
+        .limit(80),
+      supabase
+        .from("tasks")
+        .select("id, name, project_id, projects!inner(id, name, color, is_archived)")
+        .eq("projects.is_archived", false)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("projects")
+        .select("id, name, color")
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const allTasks: PickerTask[] = [];
+  for (const t of tasks ?? []) {
+    const project = (
+      Array.isArray(t.projects) ? t.projects[0] : t.projects
+    ) as { id: string; name: string; color: string } | undefined;
+    if (!project) continue;
+    allTasks.push({
+      id: t.id,
+      name: t.name,
+      projectId: project.id,
+      projectName: project.name,
+      projectColor: project.color,
+    });
+  }
+  const taskById = new Map(allTasks.map((t) => [t.id, t]));
+
+  // Last ~7 distinct tasks by most recent entry; archived projects drop out
+  // naturally because their tasks aren't in taskById.
+  const recent: PickerTask[] = [];
+  const seen = new Set<string>();
+  for (const e of recentEntries ?? []) {
+    if (!e.task_id || seen.has(e.task_id)) continue;
+    seen.add(e.task_id);
+    const task = taskById.get(e.task_id);
+    if (!task) continue;
+    recent.push(task);
+    if (recent.length >= 7) break;
+  }
+
+  return {
+    recent,
+    tasks: allTasks,
+    projects: projects ?? [],
+    defaultProjectId: recent[0]?.projectId ?? projects?.[0]?.id ?? null,
+  };
+}
+
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const running = await getRunningEntry();
+  const [running, picker] = await Promise.all([
+    getRunningEntry(),
+    getPickerData(),
+  ]);
 
   return (
     <div className="md:grid md:grid-cols-[236px_1fr] md:items-start">
       <Sidebar />
-      <div className="min-w-0">
+      {/* Bottom padding keeps the mobile tab bar from covering content. */}
+      <div className="min-w-0 pb-[calc(5rem_+_env(safe-area-inset-bottom))] md:pb-0">
         <MobileBar />
-        <RunningTimerBar running={running} />
+        <StartBar running={running} picker={picker} />
         {children}
       </div>
     </div>

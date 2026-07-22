@@ -24,6 +24,14 @@ export function formatCompact(totalSeconds: number | null | undefined): string {
   return `${s}s`;
 }
 
+/** Short clock label, always h:mm (plan §8), e.g. "2:05" or "0:00". */
+export function formatClock(totalSeconds: number | null | undefined): string {
+  const s = Math.max(0, Math.floor(totalSeconds ?? 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h}:${String(m).padStart(2, "0")}`;
+}
+
 export function elapsedSeconds(startedAtIso: string, now = Date.now()): number {
   return Math.max(0, Math.floor((now - new Date(startedAtIso).getTime()) / 1000));
 }

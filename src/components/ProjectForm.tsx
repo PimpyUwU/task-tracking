@@ -7,7 +7,14 @@ const SWATCHES = ["#ff3b00", "#111012", "#1f6feb", "#1a7f5a", "#9a6dff", "#d4a01
 
 type ClientOption = { id: string; name: string };
 
-export function ProjectForm({ clients = [] }: { clients?: ClientOption[] }) {
+export function ProjectForm({
+  clients = [],
+  variant = "primary",
+}: {
+  clients?: ClientOption[];
+  /** "ghost" demotes the trigger where the timer is the primary action. */
+  variant?: "primary" | "ghost";
+}) {
   const [open, setOpen] = useState(false);
   const [color, setColor] = useState(SWATCHES[0]);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +37,10 @@ export function ProjectForm({ clients = [] }: { clients?: ClientOption[] }) {
 
   if (!open) {
     return (
-      <button className="btn btn-accent" onClick={() => setOpen(true)}>
+      <button
+        className={variant === "ghost" ? "btn btn-ghost" : "btn btn-accent"}
+        onClick={() => setOpen(true)}
+      >
         + New project
       </button>
     );

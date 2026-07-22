@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ClientForm } from "@/components/ClientForm";
 import { formatMoney } from "@/lib/invoice";
+import { getUnbilledByClient } from "@/lib/unbilled";
 import type { Client } from "@/lib/database.types";
 
 function relativeDate(iso: string | null): string {
@@ -19,7 +20,7 @@ function relativeDate(iso: string | null): string {
 export default async function ClientsPage() {
   const supabase = await createClient();
 
-  const [{ data: clients }, { data: projects }, { data: unbilled }, { data: rollups }] =
+  const [{ data: clients }, { data: projects }, { data: rollups }, unbilled] =
     await Promise.all([
       supabase
         .from("clients")
@@ -27,43 +28,26 @@ export default async function ClientsPage() {
         .order("is_archived", { ascending: true })
         .order("name", { ascending: true }),
       supabase.from("projects").select("id, client_id, rate, is_archived"),
-      supabase
-        .from("time_entries")
-        .select("duration_seconds, tasks!inner(project_id)")
-        .eq("is_billable", true)
-        .is("invoice_id", null)
-        .not("ended_at", "is", null),
       supabase.from("task_rollups").select("project_id, last_tracked_at"),
+      getUnbilledByClient(supabase),
     ]);
 
   const list = (clients ?? []) as Client[];
-  const clientById = new Map(list.map((c) => [c.id, c]));
 
-  // project → client + effective rate
+  // project → client, plus active-project counts
   const projClient = new Map<string, string | null>();
-  const projRate = new Map<string, number>();
   const activeByClient = new Map<string, number>();
   for (const p of projects ?? []) {
     projClient.set(p.id, p.client_id);
-    const c = p.client_id ? clientById.get(p.client_id) : null;
-    projRate.set(p.id, p.rate ?? c?.default_rate ?? 0);
     if (p.client_id && !p.is_archived) {
       activeByClient.set(p.client_id, (activeByClient.get(p.client_id) ?? 0) + 1);
     }
   }
 
-  // unbilled billable amount per client
-  const unbilledByClient = new Map<string, number>();
-  for (const e of unbilled ?? []) {
-    const task = (Array.isArray(e.tasks) ? e.tasks[0] : e.tasks) as
-      | { project_id: string }
-      | undefined;
-    if (!task) continue;
-    const clientId = projClient.get(task.project_id);
-    if (!clientId) continue;
-    const amount = ((e.duration_seconds ?? 0) / 3600) * (projRate.get(task.project_id) ?? 0);
-    unbilledByClient.set(clientId, (unbilledByClient.get(clientId) ?? 0) + amount);
-  }
+  // unbilled billable amount per client (shared with Today's Unbilled card)
+  const unbilledByClient = new Map(
+    unbilled.perClient.map((r) => [r.clientId, r.amount]),
+  );
 
   // last activity per client (max across its projects)
   const lastByClient = new Map<string, string>();
@@ -75,8 +59,8 @@ export default async function ClientsPage() {
     if (!prev || r.last_tracked_at > prev) lastByClient.set(clientId, r.last_tracked_at);
   }
 
-  const totalUnbilled = [...unbilledByClient.values()].reduce((a, b) => a + b, 0);
-  const cur = list.find((c) => c.currency)?.currency ?? "USD";
+  const totalUnbilled = unbilled.total;
+  const cur = unbilled.currency;
 
   return (
     <div className="max-w-5xl px-5 md:px-8 py-7 flex flex-col gap-6">

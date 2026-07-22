@@ -18,10 +18,17 @@ export type FunnelEvent =
   | "invoice_generated"
   | "upgrade";
 
+/**
+ * Product events outside the four funnel steps. `timer_started` carries a
+ * `source` prop ("start_bar" | "task_row" | "first_run") to prove whether the
+ * Start bar wins (UX rework §11).
+ */
+export type AppEvent = FunnelEvent | "timer_started";
+
 /** Fire-and-forget: record one event for the current user. Errors are swallowed. */
 export async function track(
   supabase: Supabase,
-  event: FunnelEvent,
+  event: AppEvent,
   props?: Record<string, unknown>,
 ): Promise<void> {
   try {

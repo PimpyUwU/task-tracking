@@ -317,6 +317,224 @@ body {
     color: var(--color-ink-2);
     box-shadow: inset 3px 0 0 var(--color-line-strong);
   }
+
+  /* ---- Start bar — the idle bar is a control, not a status display ---- */
+  .startbar-open {
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .startbar-open:hover {
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+    box-shadow: inset 3px 0 0 var(--color-accent);
+  }
+  .startbar-open:focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: -3px;
+  }
+  .startbar-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    border-radius: 999px;
+    padding-left: 2px;
+    background: var(--accent-dim);
+    color: var(--color-accent);
+    font-size: 0.55rem;
+  }
+  .startbar-switch {
+    min-width: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .startbar-switch:focus-visible {
+    outline: 2px solid var(--d-teal);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Keyboard hint chip (⌘K etc.) */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.4rem;
+    border-radius: 5px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface-2);
+    color: var(--color-ink-2);
+  }
+
+  /* ---- Quick-picker — start anything from anywhere ---- */
+  .qp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 5.75rem 1rem 1rem;
+    background: rgba(15, 26, 28, 0.32);
+  }
+  .qp {
+    width: min(34rem, 100%);
+    max-height: min(70vh, 30rem);
+    display: flex;
+    flex-direction: column;
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: 0 18px 50px -18px rgba(15, 26, 28, 0.4);
+    overflow: hidden;
+    animation: qp-pop 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .qp-input {
+    width: 100%;
+    padding: 0.9rem 1.1rem;
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.9375rem;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-ink);
+    outline: none;
+  }
+  .qp-input::placeholder { color: var(--color-ink-3); }
+  .qp-body {
+    overflow-y: auto;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+  .qp-label { padding: 0.5rem 0.5rem 0.25rem; }
+  .qp-note {
+    padding: 0.4rem 0.5rem 0;
+    font-size: 0.7rem;
+    color: var(--color-ink-3);
+  }
+  .qp-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.55rem 0.6rem;
+    border-radius: var(--radius);
+    text-align: left;
+    color: var(--color-ink);
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .qp-item:hover,
+  .qp-item[data-active="true"] { background: var(--color-surface-2); }
+  .qp-item:disabled { opacity: 0.5; cursor: default; }
+  .qp-empty {
+    padding: 1.1rem 0.6rem 0.9rem;
+    font-size: 0.8125rem;
+    color: var(--color-ink-3);
+  }
+  .qp-create {
+    margin-top: 0.125rem;
+    padding: 0.6rem;
+    border-radius: var(--radius);
+    background: var(--accent-dim);
+  }
+  .qp-create-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  .qp-error {
+    padding: 0.4rem 0.6rem 0.5rem;
+    color: var(--danger);
+  }
+  .qp-foot {
+    display: none;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.6563rem;
+    color: var(--color-ink-3);
+  }
+  @media (min-width: 768px) {
+    .qp-foot { display: flex; }
+  }
+
+  /* ---- Mobile bottom tabs + raised center Start (plan F7) ---- */
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    align-items: stretch;
+    background: var(--color-paper-2);
+    border-top: 1px solid var(--color-line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.6rem 0 0.55rem;
+    font-size: 0.6563rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-ink-3);
+    transition: color 150ms ease;
+  }
+  .tab-item .tab-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 3px;
+    background: currentColor;
+    opacity: 0.5;
+  }
+  .tab-item[data-active="true"] { color: var(--color-accent); }
+  .tab-item[data-active="true"] .tab-dot { opacity: 1; }
+  .tab-start {
+    align-self: center;
+    justify-self: center;
+    width: 3.4rem;
+    height: 3.4rem;
+    margin-top: -1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    border: 4px solid var(--paper);
+    box-shadow: 0 8px 20px -8px rgba(14, 92, 99, 0.55);
+    font-size: 0.8rem;
+    padding-left: 2px;
+    cursor: pointer;
+  }
+  .tab-start:disabled { opacity: 0.6; }
+  .tab-start[data-running="true"] {
+    background: var(--color-ink);
+    padding-left: 0;
+    animation: pulse-ring 1.6s ease-out infinite;
+  }
+  .tab-stop-glyph {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 2px;
+    background: var(--d-teal);
+  }
 }
 
 /* ---- Intentional motion ---- */
@@ -339,8 +557,14 @@ body {
   animation: pulse-ring 1.6s ease-out infinite;
 }
 
+/* Quick-picker entrance — opacity/transform only. */
+@keyframes qp-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rise, .live-dot { animation: none; }
+  .rise, .live-dot, .qp, .tab-start[data-running="true"] { animation: none; }
 }
 
 /* ============================================================
