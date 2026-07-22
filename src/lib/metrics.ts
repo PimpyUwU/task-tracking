@@ -1,7 +1,7 @@
 import type { Supabase } from "@/lib/invoice";
 
 /**
- * Aggregated billing metrics for the Overview hero. All money is derived from
+ * Aggregated earnings metrics for the Today hero. All money is derived from
  * the layered effective rate (project.rate ?? client.default_rate ?? 0) applied
  * to billable seconds. Weeks are Monday-based, computed in UTC.
  */

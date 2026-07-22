@@ -49,6 +49,36 @@ export async function getPlan(supabase: Supabase): Promise<Plan> {
   };
 }
 
+export type PlanUsage = {
+  tier: PlanTier;
+  status: string;
+  clients: { used: number; limit: number };
+  projects: { used: number; limit: number };
+  canInvoice: boolean;
+};
+
+/**
+ * Current counts against the plan ceilings — powers the Plan-page meters and the
+ * inline counters near create actions (plan §9). Counts every row (archived
+ * included) so the numbers match `assertWithinLimit`'s gate exactly. Paid tier
+ * reports Infinity limits.
+ */
+export async function getPlanUsage(supabase: Supabase): Promise<PlanUsage> {
+  const plan = await getPlan(supabase);
+  const [{ count: clients }, { count: projects }] = await Promise.all([
+    supabase.from("clients").select("id", { count: "exact", head: true }),
+    supabase.from("projects").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    tier: plan.tier,
+    status: plan.status,
+    clients: { used: clients ?? 0, limit: plan.limits.clients },
+    projects: { used: projects ?? 0, limit: plan.limits.projects },
+    canInvoice: plan.canInvoice,
+  };
+}
+
 /** Returns an `{ error }` to surface to the UI when the user can't invoice, else null. */
 export async function assertCanInvoice(
   supabase: Supabase,

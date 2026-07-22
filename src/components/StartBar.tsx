@@ -445,9 +445,9 @@ function MobileTabs({
         )}
       </button>
       <TabLink
-        href="/clients"
-        label="Clients"
-        active={path.startsWith("/clients")}
+        href="/more"
+        label="More"
+        active={path.startsWith("/more")}
       />
     </nav>
   );

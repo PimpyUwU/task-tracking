@@ -6,6 +6,7 @@ import { Sparkline } from "@/components/Sparkline";
 import { formatHours, formatClock, elapsedSeconds } from "@/lib/time";
 import { formatMoney } from "@/lib/invoice";
 import { getOverviewMetrics } from "@/lib/metrics";
+import { getPlanUsage } from "@/lib/plan";
 import { getUnbilledByClient } from "@/lib/unbilled";
 import type { Supabase } from "@/lib/invoice";
 import type { Project, ProjectRollup } from "@/lib/database.types";
@@ -63,7 +64,7 @@ async function getTodayStrip(supabase: Supabase): Promise<TodayStrip> {
 export default async function TodayPage() {
   const supabase = await createClient();
 
-  const [{ data: projects }, { data: rollups }, { data: clients }, metrics, unbilled, today] =
+  const [{ data: projects }, { data: rollups }, { data: clients }, metrics, unbilled, today, usage] =
     await Promise.all([
       supabase
         .from("projects")
@@ -79,6 +80,7 @@ export default async function TodayPage() {
       getOverviewMetrics(supabase),
       getUnbilledByClient(supabase),
       getTodayStrip(supabase),
+      getPlanUsage(supabase),
     ]);
 
   const list = (projects ?? []) as Project[];
@@ -121,7 +123,16 @@ export default async function TodayPage() {
             Here’s what you’ve earned this week.
           </p>
         </div>
-        <ProjectForm clients={clientOptions} variant="ghost" />
+        <ProjectForm
+          clients={clientOptions}
+          variant="ghost"
+          usageHint={
+            usage.tier === "free" &&
+            usage.projects.used >= usage.projects.limit - 1
+              ? `${usage.projects.used} of ${usage.projects.limit} free projects`
+              : undefined
+          }
+        />
       </div>
 
       {/* Today strip — tracked time + what's running now */}

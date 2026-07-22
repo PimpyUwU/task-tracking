@@ -39,7 +39,7 @@ export function UpgradeButton({
   if (!configured) {
     return (
       <button className="btn" disabled>
-        Upgrade (billing not configured)
+        Upgrade (checkout not configured)
       </button>
     );
   }

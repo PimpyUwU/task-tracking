@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ClientForm } from "@/components/ClientForm";
+import { PlanMeter } from "@/components/PlanMeter";
 import { formatMoney } from "@/lib/invoice";
 import { getUnbilledByClient } from "@/lib/unbilled";
+import { getPlanUsage } from "@/lib/plan";
 import type { Client } from "@/lib/database.types";
 
 function relativeDate(iso: string | null): string {
@@ -20,17 +22,29 @@ function relativeDate(iso: string | null): string {
 export default async function ClientsPage() {
   const supabase = await createClient();
 
-  const [{ data: clients }, { data: projects }, { data: rollups }, unbilled] =
-    await Promise.all([
-      supabase
-        .from("clients")
-        .select("*")
-        .order("is_archived", { ascending: true })
-        .order("name", { ascending: true }),
-      supabase.from("projects").select("id, client_id, rate, is_archived"),
-      supabase.from("task_rollups").select("project_id, last_tracked_at"),
-      getUnbilledByClient(supabase),
-    ]);
+  const [
+    { data: clients },
+    { data: projects },
+    { data: rollups },
+    unbilled,
+    usage,
+  ] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("*")
+      .order("is_archived", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase.from("projects").select("id, client_id, rate, is_archived"),
+    supabase.from("task_rollups").select("project_id, last_tracked_at"),
+    getUnbilledByClient(supabase),
+    getPlanUsage(supabase),
+  ]);
+
+  // Quiet heads-up as the free ceiling nears — one below it, or at it (plan §9).
+  const nearClientLimit =
+    usage.tier === "free" &&
+    Number.isFinite(usage.clients.limit) &&
+    usage.clients.used >= usage.clients.limit - 1;
 
   const list = (clients ?? []) as Client[];
 
@@ -71,7 +85,17 @@ export default async function ClientsPage() {
             Who you bill — and what’s waiting to be invoiced.
           </p>
         </div>
-        <ClientForm mode="create" />
+        <div className="flex flex-col items-stretch sm:items-end gap-2">
+          {nearClientLimit && (
+            <PlanMeter
+              variant="inline"
+              label="clients"
+              used={usage.clients.used}
+              limit={usage.clients.limit}
+            />
+          )}
+          <ClientForm mode="create" />
+        </div>
       </div>
 
       {list.length > 0 && (

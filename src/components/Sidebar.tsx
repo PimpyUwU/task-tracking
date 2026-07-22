@@ -22,7 +22,7 @@ export async function Sidebar() {
   return (
     <aside className="hidden md:flex md:flex-col md:h-screen md:sticky md:top-0 border-r border-line bg-paper-2">
       <div className="px-4 h-16 flex items-center border-b border-line">
-        <Link href="/" aria-label="FluxWork — Overview">
+        <Link href="/" aria-label="FluxWork — Today">
           <Wordmark />
         </Link>
       </div>

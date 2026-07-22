@@ -5,30 +5,44 @@ import { usePathname } from "next/navigation";
 
 type Item = { id: string; name: string; color: string };
 
+/** Solid-square nav dot shared by the primary and Manage clusters. */
+function Dot() {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-2 w-2 shrink-0 rounded-[2px]"
+      style={{ background: "var(--color-ink-3)" }}
+    />
+  );
+}
+
 export function SidebarNav({ projects }: { projects: Item[] }) {
   const path = usePathname();
 
-  const topLinks: { href: string; label: string }[] = [
-    { href: "/", label: "Overview" },
-    { href: "/clients", label: "Clients" },
+  // Track → Review → Invoice lives up top; Clients/Plan are configuration and
+  // drop to a separated "Manage" cluster below the projects (plan §5).
+  const primary = [
+    { href: "/", label: "Today" },
     { href: "/invoices", label: "Invoices" },
-    { href: "/billing", label: "Billing" },
   ];
+  const manage = [
+    { href: "/clients", label: "Clients" },
+    { href: "/plan", label: "Plan" },
+  ];
+
+  const isActive = (href: string) =>
+    href === "/" ? path === "/" : path.startsWith(href);
 
   return (
     <nav className="flex flex-col gap-0.5">
-      {topLinks.map((l) => (
+      {primary.map((l) => (
         <Link
           key={l.href}
           href={l.href}
           className="nav-item"
-          data-active={l.href === "/" ? path === "/" : path.startsWith(l.href)}
+          data-active={isActive(l.href)}
         >
-          <span
-            aria-hidden
-            className="inline-block h-2 w-2 shrink-0 rounded-[2px]"
-            style={{ background: "var(--color-ink-3)" }}
-          />
+          <Dot />
           {l.label}
         </Link>
       ))}
@@ -59,6 +73,21 @@ export function SidebarNav({ projects }: { projects: Item[] }) {
           );
         })
       )}
+
+      <div className="mt-6 pt-3 border-t border-line flex flex-col gap-0.5">
+        <span className="label text-ink-3 px-2 pb-1">Manage</span>
+        {manage.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="nav-item"
+            data-active={isActive(l.href)}
+          >
+            <Dot />
+            {l.label}
+          </Link>
+        ))}
+      </div>
     </nav>
   );
 }
