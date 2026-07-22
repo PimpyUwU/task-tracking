@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Worktree copies of the repo (each with its own node_modules) — not app code.
+    ".claude/worktrees/**",
   ]),
 ]);
 
