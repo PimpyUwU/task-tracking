@@ -1,6 +1,7 @@
 {
   "enabledPlugins": {
     "impeccable@impeccable": true,
-    "paddle@claude-community": true
+    "paddle@claude-community": true,
+    "impeccable@claude-community": true
   }
 }
